@@ -135,9 +135,21 @@ function syncScroll() {
 }
 
 function handleWheel(e: WheelEvent) {
-    if (e.shiftKey && bodyContainer.value) {
-        e.preventDefault();
-        bodyContainer.value.scrollLeft += e.deltaY;
+    if (!bodyContainer.value) return;
+
+    // 如果是 Mac 触摸板或已经产生水平滚动增量，让原生行为处理（除非被 preventDefault 阻止）
+    // 但这里我们想要手动控制或者增强
+    // 通常 Shift + 滚轮应该产生 deltaX (Mac) 或 deltaY (Windows Mouse + Shift)
+    
+    if (e.shiftKey) {
+        if (e.deltaX !== 0) {
+            // 原生支持 Shift -> deltaX 的设备 (Mac Trackpad)
+            // 不需要干预，除非我们想要自定义速度
+        } else {
+             // 鼠标滚轮 + Shift，通常产生 deltaY，我们需要将其转换为水平滚动
+             e.preventDefault();
+             bodyContainer.value.scrollLeft += e.deltaY;
+        }
     }
 }
 

@@ -18,6 +18,7 @@ import {
 import { useProjectStore } from '@/stores/project';
 import { useLabelStore } from '@/stores/label';
 import { useTaskStore } from '@/stores/task';
+import { useSettingsStore } from '@/stores/settings';
 import { useI18n } from 'vue-i18n';
 const { t } = useI18n();
 
@@ -26,6 +27,7 @@ const router = useRouter();
 const projectStore = useProjectStore();
 const labelStore = useLabelStore();
 const taskStore = useTaskStore();
+const settingsStore = useSettingsStore();
 
 // 获取当前激活的项目视图模式 (默认为 board)
 const activeProjectView = computed(() => {
@@ -489,6 +491,7 @@ const sidebarWidth = computed(() => isCollapsed.value ? 'w-16' : 'w-60');
 
         <!-- 设置按钮（右侧） -->
         <button 
+          @click="settingsStore.openSettings()"
           class="flex items-center gap-2 flex-1 px-2 py-1.5 text-sm font-medium text-gray-500 dark:text-gray-400 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
           :title="t('common.preferences')"
         >

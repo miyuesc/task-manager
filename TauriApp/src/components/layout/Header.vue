@@ -20,14 +20,18 @@
       <button 
         @click="toggleTheme" 
         class="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
-        :title="isDark ? '切换到浅色模式' : '切换到深色模式'"
+        :title="settingsStore.isDark ? '切换到浅色模式' : '切换到深色模式'"
       >
-        <Sun v-if="isDark" class="w-5 h-5" />
-        <Moon v-else class="w-5 h-5" />
+        <Moon v-if="settingsStore.theme === 'dark'" class="w-5 h-5" />
+        <Monitor v-else-if="settingsStore.theme === 'auto'" class="w-5 h-5" />
+        <Sun v-else class="w-5 h-5" />
       </button>
 
       <!-- Settings -->
-      <button class="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-colors">
+      <button 
+        @click="settingsStore.openSettings()"
+        class="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+      >
         <Settings class="w-5 h-5" />
       </button>
 
@@ -42,41 +46,32 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
 import { 
   Settings, 
   Sun,
   Moon,
-  Languages
+  Languages,
+  Monitor
 } from 'lucide-vue-next';
 import { useI18n } from 'vue-i18n';
 import GlobalSearch from './GlobalSearch.vue';
+import { useSettingsStore } from '@/stores/settings';
 
 const { t, locale } = useI18n();
-
-const isDark = ref(false);
+const settingsStore = useSettingsStore();
 
 const toggleTheme = () => {
-  isDark.value = !isDark.value;
-  if (isDark.value) {
-    document.documentElement.classList.add('dark');
-    localStorage.setItem('theme', 'dark');
+  // Cycle: Auto -> Light -> Dark -> Auto? 
+  // Or just toggle Light/Dark? 
+  // Let's implement toggle between Light/Dark for simplicity on the button, 
+  // but if it's Auto, we switch to the OTHER one relative to system, or just Light.
+  
+  if (settingsStore.theme === 'auto') {
+    settingsStore.setTheme(settingsStore.isDark ? 'light' : 'dark');
   } else {
-    document.documentElement.classList.remove('dark');
-    localStorage.setItem('theme', 'light');
+    settingsStore.setTheme(settingsStore.theme === 'dark' ? 'light' : 'dark');
   }
 };
-
-onMounted(() => {
-  const savedTheme = localStorage.getItem('theme');
-  if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-    isDark.value = true;
-    document.documentElement.classList.add('dark');
-  } else {
-    isDark.value = false;
-    document.documentElement.classList.remove('dark');
-  }
-});
 </script>
 
 <style scoped>

@@ -1,46 +1,67 @@
 <template>
   <AppLayout>
     <router-view />
+    <SettingsModal 
+      :is-open="settingsStore.isSettingsOpen" 
+      @close="settingsStore.closeSettings()" 
+    />
   </AppLayout>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { onMounted, onUnmounted, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import AppLayout from '@/layouts/AppLayout.vue';
+import SettingsModal from '@/components/common/SettingsModal.vue';
+import { useSettingsStore } from '@/stores/settings';
 
-const zoomLevel = ref(1);
-const baseFontSize = 14; // 从 style.css 里的 :root font-size: 14px 继承
+const { locale } = useI18n();
+const settingsStore = useSettingsStore();
 
-function updateZoom() {
-  const newSize = baseFontSize * zoomLevel.value;
-  document.documentElement.style.fontSize = `${newSize}px`;
-}
-
+// Zoom Shortcut Logic
 function handleKeydown(e: KeyboardEvent) {
   if (e.metaKey || e.ctrlKey) {
     if (e.key === '=' || e.key === '+') {
       e.preventDefault();
-      zoomLevel.value = parseFloat((zoomLevel.value + 0.1).toFixed(1));
-      updateZoom();
+      const newZoom = Math.min(1.5, settingsStore.zoomLevel + 0.1);
+      settingsStore.setZoom(newZoom);
     } else if (e.key === '-') {
       e.preventDefault();
-      if (zoomLevel.value > 0.5) {
-        zoomLevel.value = parseFloat((zoomLevel.value - 0.1).toFixed(1));
-        updateZoom();
-      }
+      const newZoom = Math.max(0.5, settingsStore.zoomLevel - 0.1);
+      settingsStore.setZoom(newZoom);
     } else if (e.key === '0') {
       e.preventDefault();
-      zoomLevel.value = 1;
-      updateZoom();
+      settingsStore.setZoom(1);
     }
   }
 }
 
+// Sync Locale
+watch(
+  () => settingsStore.locale,
+  (newLocale) => {
+    locale.value = newLocale;
+  }
+);
+
+watch(
+  locale,
+  (newLocale) => {
+    if (newLocale !== settingsStore.locale) {
+      settingsStore.setLocale(newLocale as string);
+    }
+  }
+);
+
 onMounted(() => {
-  // 确保初始 zoom 被清除
-  (document.body.style as any).zoom = '';
-  // 根据当前设置初始化
-  updateZoom(); 
+  // Initialize settings
+  // Trust store persistence via pinia-plugin-persistedstate which runs before mount usually.
+  // But we need to call init() to apply styles.
+  settingsStore.init();
+  
+  // Sync initial locale
+  locale.value = settingsStore.locale;
+
   window.addEventListener('keydown', handleKeydown);
 });
 

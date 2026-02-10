@@ -14,12 +14,12 @@
           v-for="view in views" 
           :key="view.name"
           @click="switchView(view.name)"
-          class="flex cursor-pointer h-full items-center justify-center rounded px-3 transition-all text-sm font-medium leading-normal gap-2"
+          class="flex cursor-pointer h-full items-center justify-center rounded px-3 transition-all text-xs font-medium leading-normal gap-2"
           :class="activeView === view.name 
             ? 'bg-white dark:bg-zinc-700 shadow-sm text-slate-900 dark:text-white' 
             : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-zinc-700/50'"
         >
-          <component :is="view.icon" class="w-[18px] h-[18px]" />
+          <component :is="view.icon" class="w-[16px] h-[16px]" />
           <span class="hidden md:inline">{{ view.label }}</span>
         </button>
       </div>

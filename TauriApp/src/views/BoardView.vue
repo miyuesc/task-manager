@@ -1,5 +1,5 @@
 <template>
-  <div class="h-full flex gap-4 overflow-x-auto px-6 py-4" ref="boardContainer">
+  <div class="h-full flex gap-4 overflow-x-auto px-6 py-4" ref="boardContainer" @wheel="handleWheel">
     <!-- Columns Container -->
     <div ref="columnsRef" class="flex gap-4">
       <div 
@@ -175,6 +175,20 @@ const projectId = computed(() => route.params.id as string);
 // DOM 引用
 const columnsRef = ref<HTMLElement | null>(null);
 const newColumnInputRef = ref<HTMLInputElement | null>(null);
+const boardContainer = ref<HTMLElement | null>(null);
+
+function handleWheel(e: WheelEvent) {
+  if (!boardContainer.value) return;
+  
+  // Shift + Scroll for Horizontal Scroll
+  if (e.shiftKey) {
+     if (e.deltaX === 0) {
+       // Conventional Mouse wheel + Shift -> Convert Y to X
+       e.preventDefault();
+       boardContainer.value.scrollLeft += e.deltaY;
+     }
+  }
+}
 
 const projectStore = useProjectStore();
 

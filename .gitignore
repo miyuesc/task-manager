@@ -1,0 +1,32 @@
+# OS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+dist/
+
+# Editor
+.vscode
+.idea
+*.swp
+*.swo
+
+# Tauri
+src-tauri/target/
+src-tauri/gen/
+
+# Rust
+target/
+Cargo.lock
+
+# App specific
+**/TauriApp/node_modules/
+**/TauriApp/dist/
+**/TauriApp/src-tauri/target/
+**/TauriApp/src-tauri/gen/

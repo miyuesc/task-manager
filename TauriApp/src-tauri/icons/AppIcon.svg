@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>TaskFlow App Icon</title>
+    <defs>
+        <!-- 主背景渐变: 从左上角的亮蓝到右下角的深蓝 -->
+        <linearGradient x1="0%" y1="0%" x2="100%" y2="100%" id="bgGradient">
+            <stop stop-color="#3B82F6" offset="0%"></stop> <!-- blue-500 equivalent -->
+            <stop stop-color="#2563EB" offset="100%"></stop> <!-- blue-600 equivalent -->
+        </linearGradient>
+        
+        <!-- 微妙的顶部高光，增加立体感 -->
+        <linearGradient x1="50%" y1="0%" x2="50%" y2="100%" id="highlightGradient">
+            <stop stop-color="#FFFFFF" stop-opacity="0.2" offset="0%"></stop>
+            <stop stop-color="#FFFFFF" stop-opacity="0" offset="20%"></stop>
+        </linearGradient>
+
+        <!-- 投影滤镜 -->
+        <filter id="dropShadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="15"/>
+            <feOffset dx="0" dy="8" result="offsetblur"/>
+            <feComponentTransfer>
+                <feFuncA type="linear" slope="0.3"/>
+            </feComponentTransfer>
+            <feMerge> 
+                <feMergeNode/>
+                <feMergeNode in="SourceGraphic"/> 
+            </feMerge>
+        </filter>
+        
+        <!-- 内部图标投影 -->
+        <filter id="iconShadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="8"/>
+            <feOffset dx="0" dy="4" result="offsetblur"/>
+            <feComponentTransfer>
+                <feFuncA type="linear" slope="0.2"/>
+            </feComponentTransfer>
+            <feMerge> 
+                <feMergeNode/>
+                <feMergeNode in="SourceGraphic"/> 
+            </feMerge>
+        </filter>
+    </defs>
+
+    <!-- 背景圆角矩形 -->
+    <rect id="Background" fill="url(#bgGradient)" x="0" y="0" width="1024" height="1024" rx="220" ry="220"></rect>
+    
+    <!-- 顶部高光层 -->
+    <rect id="Highlight" fill="url(#highlightGradient)" x="0" y="0" width="1024" height="1024" rx="220" ry="220"></rect>
+
+    <!-- 中心白色图标 (CheckSquare 风格的勾选) -->
+    <g id="Icon" transform="translate(232, 232) scale(2.2)" filter="url(#iconShadow)">
+        <!-- 一个简单的白色勾选路径 -->
+        <path d="M208,64 L64,64 C46.326888,64 32,78.326888 32,96 L32,192 C32,209.673112 46.326888,224 64,224 L208,224 C225.673112,224 240,209.673112 240,192 L240,128" fill="none" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"></path>
+        <path d="M88,144 L136,192 L256,72" fill="none" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"></path>
+    </g>
+</svg>

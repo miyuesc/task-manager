@@ -38,7 +38,12 @@
       <!-- User Avatar -->
       <button class="ml-1">
         <div class="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center overflow-hidden ring-2 ring-white dark:ring-zinc-800">
-          <span class="text-white text-xs font-medium">M</span>
+          <img 
+              v-if="settingsStore.userAvatar" 
+              :src="settingsStore.userAvatar" 
+              class="w-full h-full object-cover"
+          />
+          <span v-else class="text-white text-xs font-medium">{{ settingsStore.userName.charAt(0).toUpperCase() }}</span>
         </div>
       </button>
     </div>

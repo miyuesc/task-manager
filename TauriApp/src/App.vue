@@ -14,9 +14,11 @@ import { useI18n } from 'vue-i18n';
 import AppLayout from '@/layouts/AppLayout.vue';
 import SettingsModal from '@/components/common/SettingsModal.vue';
 import { useSettingsStore } from '@/stores/settings';
+import { useSyncStore } from '@/stores/sync';
 
 const { locale } = useI18n();
 const settingsStore = useSettingsStore();
+const syncStore = useSyncStore();
 
 // Zoom Shortcut Logic
 function handleKeydown(e: KeyboardEvent) {
@@ -58,6 +60,9 @@ onMounted(() => {
   // Trust store persistence via pinia-plugin-persistedstate which runs before mount usually.
   // But we need to call init() to apply styles.
   settingsStore.init();
+  
+  // Initialize Cloud Sync if configured
+  syncStore.initSync();
   
   // Sync initial locale
   locale.value = settingsStore.locale;

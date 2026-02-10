@@ -103,6 +103,9 @@ export default {
     language: "Language",
     zoom: "Zoom",
     user_name: "Username",
+    user_avatar: "Avatar",
+    upload_avatar: "Upload Avatar",
+    remove_avatar: "Remove Avatar",
     data_warning_title: "Warning",
     data_warning_desc:
       "Importing data will overwrite all current tasks and settings. Please ensure you have backed up important data.",
@@ -115,5 +118,18 @@ export default {
       "Are you sure you want to import? This will overwrite all current data.",
     import_success: "Import successful!",
     import_error: "Import failed. Please check the file format.",
+    cloud_sync: "Cloud Sync",
+    sync_folder: "Sync Folder",
+    select_folder: "Select Folder",
+    current_path: "Current Path",
+    last_synced: "Last Synced",
+    sync_status: "Sync Status",
+    sync_error: "Sync Error",
+    sync_active: "Active (Watching changes)",
+    sync_inactive: "Inactive",
+    manual_sync: "Sync Now",
+    stop_sync: "Stop Sync",
+    cloud_tips:
+      "Tip: Select an iCloud Drive or OneDrive folder to enable cross-device sync.",
   },
 };

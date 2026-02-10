@@ -19,7 +19,7 @@
         <!-- Content -->
         <div class="flex flex-1 overflow-hidden">
           <!-- Sidebar -->
-          <div class="w-48 border-r border-gray-100 dark:border-zinc-800 p-2 space-y-1 bg-gray-50/50 dark:bg-zinc-900/30 overflow-y-auto">
+          <div class="w-48 border-r border-gray-100 dark:border-zinc-800 p-2 mb-2 bg-gray-50/50 dark:bg-zinc-900/30 overflow-y-auto">
             <button
               v-for="tab in tabs"
               :key="tab.id"
@@ -108,7 +108,7 @@
             </section>
 
              <!-- Profile Settings -->
-             <section v-if="activeTab === 'profile'" class="space-y-6">
+             <section v-if="activeTab === 'profile'" class="space-y-8">
                <div class="space-y-3">
                   <label class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ t('settings.user_name') }}</label>
                   <input 
@@ -117,8 +117,41 @@
                     class="w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
                   />
                </div>
-               <!-- Avatar Color Picker (Simple for now) -->
-               <!-- Could expand to image upload later -->
+
+               <div class="space-y-3">
+                  <label class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ t('settings.user_avatar') }}</label>
+                  <div class="flex items-center gap-4">
+                     <!-- Avatar Preview -->
+                     <div class="w-16 h-16 rounded-full overflow-hidden bg-gradient-to-br from-amber-400 to-orange-500 shrink-0 ring-4 ring-gray-50 dark:ring-zinc-800/50">
+                        <img 
+                          v-if="settingsStore.userAvatar" 
+                          :src="settingsStore.userAvatar" 
+                          class="w-full h-full object-cover"
+                        />
+                        <div v-else class="w-full h-full flex items-center justify-center text-white text-xl font-bold">
+                           {{ settingsStore.userName.charAt(0).toUpperCase() }}
+                        </div>
+                     </div>
+                     
+                     <!-- Actions -->
+                     <div class="flex flex-col gap-2">
+                        <button 
+                          @click="uploadAvatar"
+                          class="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                        >
+                           <Upload class="w-4 h-4" />
+                           {{ t('settings.upload_avatar') }}
+                        </button>
+                        <button 
+                          v-if="settingsStore.userAvatar"
+                           @click="settingsStore.userAvatar = ''"
+                           class="text-red-500 hover:text-red-600 text-sm font-medium transition-colors text-left px-1"
+                        >
+                           {{ t('settings.remove_avatar') }}
+                        </button>
+                     </div>
+                  </div>
+               </div>
              </section>
 
             <!-- Data Management -->
@@ -168,6 +201,71 @@
                 </div>
               </div>
             </section>
+
+            <!-- Cloud Sync -->
+            <section v-if="activeTab === 'sync'" class="space-y-6">
+               <!-- Tip -->
+               <div class="p-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded-xl">
+                <div class="flex items-start gap-3">
+                  <Cloud class="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+                  <div class="text-sm">
+                    <p class="text-blue-600 dark:text-blue-300 leading-relaxed">{{ t('settings.cloud_tips') }}</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Status -->
+              <div class="space-y-4">
+                  <div class="flex flex-col gap-1">
+                      <label class="text-xs font-medium text-gray-500 uppercase tracking-wider">{{ t('settings.sync_status') }}</label>
+                      <div class="flex items-center gap-2">
+                          <div class="w-2.5 h-2.5 rounded-full" :class="syncStore.syncPath ? 'bg-green-500' : 'bg-gray-300'"></div>
+                          <span class="text-sm font-medium text-gray-900 dark:text-gray-100">
+                             {{ syncStore.syncPath ? t('settings.sync_active') : t('settings.sync_inactive') }}
+                          </span>
+                      </div>
+                      <p v-if="syncStore.lastSyncTime" class="text-xs text-gray-400">
+                          {{ t('settings.last_synced') }}: {{ new Date(syncStore.lastSyncTime).toLocaleString() }}
+                      </p>
+                      <p v-if="syncStore.syncError" class="text-xs text-red-500">
+                          {{ t('settings.sync_error') }}: {{ syncStore.syncError }}
+                      </p>
+                  </div>
+
+                  <!-- Path Selection -->
+                  <div class="space-y-2">
+                       <label class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ t('settings.sync_folder') }}</label>
+                       <div class="flex items-center gap-2">
+                           <div class="flex-1 px-3 py-2 bg-gray-50 dark:bg-zinc-900/50 border border-gray-200 dark:border-zinc-700 rounded-lg text-xs text-gray-500 truncate font-mono">
+                               {{ syncStore.syncPath || t('settings.select_folder') }}
+                           </div>
+                           <button 
+                             @click="syncStore.selectSyncFolder()"
+                             class="px-3 py-2 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-700 transition-colors whitespace-nowrap"
+                           >
+                              {{ t('common.edit') }}
+                           </button>
+                       </div>
+                  </div>
+
+                   <!-- Actions -->
+                   <div v-if="syncStore.syncPath" class="pt-4 border-t border-gray-100 dark:border-zinc-800 flex gap-3">
+                       <button 
+                         @click="syncStore.forceSync()"
+                         class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
+                         :disabled="syncStore.isSyncing"
+                       >
+                         {{ t('settings.manual_sync') }}
+                       </button>
+                        <button 
+                         @click="syncStore.stopSync()"
+                         class="px-4 py-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 text-sm font-medium rounded-lg transition-colors"
+                       >
+                         {{ t('settings.stop_sync') }}
+                       </button>
+                   </div>
+              </div>
+            </section>
           </div>
         </div>
       </div>
@@ -176,8 +274,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { open } from '@tauri-apps/plugin-dialog';
+import { readFile } from '@tauri-apps/plugin-fs';
 import { 
   X, 
   Monitor, 
@@ -190,15 +290,17 @@ import {
   Upload, 
   AlertTriangle,
   Minus,
-  Plus
+  Plus,
+  Cloud
 } from 'lucide-vue-next';
 import { useSettingsStore, Theme } from '@/stores/settings';
 import { useTaskStore } from '@/stores/task';
 import { useProjectStore } from '@/stores/project';
 import { useColumnStore } from '@/stores/column';
 import { useLabelStore } from '@/stores/label';
+import { useSyncStore } from '@/stores/sync';
 
-const props = defineProps<{
+defineProps<{
   isOpen: boolean;
 }>();
 
@@ -212,6 +314,7 @@ const taskStore = useTaskStore();
 const projectStore = useProjectStore();
 const columnStore = useColumnStore();
 const labelStore = useLabelStore();
+const syncStore = useSyncStore();
 
 // Tabs
 const activeTab = ref('general');
@@ -219,6 +322,7 @@ const tabs = [
   { id: 'general', labelKey: 'settings.general', icon: Laptop },
   { id: 'profile', labelKey: 'settings.profile', icon: User },
   { id: 'data', labelKey: 'settings.data', icon: Database },
+  { id: 'sync', labelKey: 'settings.cloud_sync', icon: Cloud },
 ];
 
 function close() {
@@ -329,6 +433,49 @@ async function importData(e: Event) {
     // Reset input
     target.value = '';
   }
+}
+
+// Avatar Upload
+async function uploadAvatar() {
+  try {
+    const selected = await open({
+      multiple: false,
+      filters: [{
+        name: 'Image',
+        extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp']
+      }]
+    });
+
+    if (selected && typeof selected === 'string') {
+      const path = selected as string;
+      // Read file and convert to base64
+      // Note: reading as binary is better, then convert.
+      // readTextFile might fail if it's binary content, but readFile returns Uint8Array.
+      
+      const contents = await readFile(path);
+      const base64String = uInt8ArrayToBase64(contents);
+      
+      // Guess mime type from extension
+      const ext = path.split('.').pop()?.toLowerCase() || 'png';
+      let mimeType = 'image/png';
+      if (ext === 'jpg' || ext === 'jpeg') mimeType = 'image/jpeg';
+      else if (ext === 'webp') mimeType = 'image/webp';
+      else if (ext === 'gif') mimeType = 'image/gif';
+      
+      settingsStore.userAvatar = `data:${mimeType};base64,${base64String}`;
+    }
+  } catch (err) {
+    console.error('Failed to upload avatar', err);
+  }
+}
+
+function uInt8ArrayToBase64(bytes: Uint8Array) {
+  let binary = '';
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return window.btoa(binary);
 }
 
 </script>

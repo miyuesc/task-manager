@@ -36,6 +36,13 @@ const navItems = [
   { name: 'trash', path: '/smart/trash', icon: Trash2, iconColor: 'text-red-500' },
 ];
 
+const visibleNavItems = computed(() => {
+  if (isCollapsed.value) {
+    return navItems.filter(item => ['progressing', 'today', 'upcoming'].includes(item.name));
+  }
+  return navItems;
+});
+
 function isActive(path: string) {
   return route.path === path;
 }
@@ -284,9 +291,25 @@ onMounted(() => {
 
 <template>
   <aside 
-    :class="[sidebarWidth, 'h-full bg-white dark:bg-zinc-950 border-r border-gray-100 dark:border-zinc-800 flex flex-col transition-all duration-300 ease-in-out']"
+    :class="[sidebarWidth, 'h-full bg-white dark:bg-zinc-950 border-r border-gray-100 dark:border-zinc-800 flex flex-col transition-all duration-300 ease-in-out relative group/sidebar']"
     @click="handleGlobalClick"
   >
+    <!-- Divider Line Control (Toggle Button) -->
+    <div 
+      class="absolute -right-3 top-1/2 -translate-y-1/2 z-50 opacity-0 group-hover/sidebar:opacity-100 transition-opacity delay-100"
+      @click.stop="toggleCollapse"
+    >
+      <div class="flex items-center justify-center w-6 h-12 cursor-pointer group/toggle">
+        <!-- Vertical Line Part -->
+        <div class="absolute h-full w-0.5 bg-transparent group-hover/toggle:bg-blue-500/50 transition-colors rounded-full"></div>
+        
+        <!-- Icon Bubble -->
+        <div class="relative w-6 h-6 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-full flex items-center justify-center shadow-sm text-gray-400 group-hover/toggle:text-blue-500 group-hover/toggle:border-blue-200 dark:group-hover/toggle:border-blue-800 transition-all transform scale-90 group-hover/toggle:scale-100">
+             <ChevronRight v-if="isCollapsed" class="w-3.5 h-3.5" />
+             <ChevronLeft v-else class="w-3.5 h-3.5" />
+        </div>
+      </div>
+    </div>
     <!-- Logo Area -->
     <div class="h-14 flex items-center px-4 shrink-0" data-tauri-drag-region>
       <div class="flex items-center gap-2.5 cursor-pointer transition-opacity hover:opacity-80" @click="router.push('/')">
@@ -301,7 +324,7 @@ onMounted(() => {
     <nav class="flex-1 overflow-y-auto overflow-x-hidden py-3 px-2 space-y-6">
       <!-- Standard Views -->
       <div class="space-y-0.5">
-        <template v-for="item in navItems" :key="item.name">
+        <template v-for="item in visibleNavItems" :key="item.name">
           <router-link 
             :to="item.path" 
             class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors"
@@ -471,38 +494,26 @@ onMounted(() => {
     </nav>
 
     <!-- Bottom Actions -->
-    <div class="border-t border-gray-100 dark:border-zinc-800 shrink-0">
-      <!-- 展开状态：水平布局 -->
-      <div v-if="!isCollapsed" class="flex items-center h-12 px-2">
-        <!-- 展开/收起按钮（左侧） -->
-        <button 
-          @click="toggleCollapse"
-          class="flex items-center justify-center w-8 h-8 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
-          :title="t('common.toggle_sidebar')"
-        >
-          <ChevronLeft class="w-5 h-5" />
-        </button>
-        <!-- 分割线 -->
-        <div class="w-px h-5 bg-gray-200 dark:bg-zinc-700 mx-2"></div>
-        
-        <!-- 设置按钮（右侧） -->
+    <div class="border-t border-gray-100 dark:border-zinc-800 shrink-0 p-2">
+      <!-- 展开状态：显示完整设置按钮 -->
+      <div v-if="!isCollapsed">
         <button 
           @click="settingsStore.openSettings()"
-          class="flex items-center gap-2 flex-1 px-2 py-1.5 text-sm font-medium text-gray-500 dark:text-gray-400 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+          class="flex items-center gap-2 w-full px-2 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
           :title="t('common.preferences')"
         >
           <Settings class="w-4 h-4 shrink-0" />
           <span>{{ t('common.preferences') }}</span>
         </button>
       </div>
-      <!-- 收起状态：显示展开按钮 -->
-      <div v-else class="flex flex-col items-center justify-center py-2 gap-2">
+      <!-- 收起状态：显示图标 -->
+      <div v-else class="flex justify-center">
         <button 
-          @click="toggleCollapse"
+          @click="settingsStore.openSettings()"
           class="flex items-center justify-center w-8 h-8 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
-          :title="t('common.toggle_sidebar')"
+          :title="t('common.preferences')"
         >
-          <ChevronRight class="w-5 h-5" />
+          <Settings class="w-5 h-5" />
         </button>
       </div>
     </div>

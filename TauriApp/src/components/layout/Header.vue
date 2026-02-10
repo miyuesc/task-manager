@@ -37,13 +37,14 @@
 
       <!-- User Avatar -->
       <button class="ml-1">
-        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center overflow-hidden ring-2 ring-white dark:ring-zinc-800">
+        <div class="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden ring-2 ring-white dark:ring-zinc-800"
+             :class="settingsStore.userAvatar ? 'bg-transparent' : 'bg-gradient-to-br from-amber-400 to-orange-500'">
           <img 
               v-if="settingsStore.userAvatar" 
               :src="settingsStore.userAvatar" 
               class="w-full h-full object-cover"
           />
-          <span v-else class="text-white text-xs font-medium">{{ settingsStore.userName.charAt(0).toUpperCase() }}</span>
+          <span v-else class="text-white text-xs font-medium">{{ settingsStore.userName ? settingsStore.userName.charAt(0).toUpperCase() : 'U' }}</span>
         </div>
       </button>
     </div>

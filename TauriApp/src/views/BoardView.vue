@@ -158,12 +158,14 @@ import { useColumnStore } from '@/stores/column';
 import { useProjectStore } from '@/stores/project';
 import { useTaskStore, Task } from '@/stores/task';
 import { useTaskModal } from '@/composables/useTaskModal';
+import { useConfirm } from '@/composables/useConfirm';
 import TaskCard from '@/components/board/TaskCard.vue';
 import ContextMenu from '@/components/common/ContextMenu.vue';
 import { MoreHorizontal, Plus, Pencil, Check, Trash2, BarChart3 } from 'lucide-vue-next';
 import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
+const { confirm } = useConfirm();
 const route = useRoute();
 const columnStore = useColumnStore();
 const taskStore = useTaskStore();
@@ -192,16 +194,19 @@ function handleWheel(e: WheelEvent) {
 
 const projectStore = useProjectStore();
 
-// Sortable 实例
+// Sortable 实例引用
 let columnSortable: Sortable | null = null;
 const taskSortables: Map<string, Sortable> = new Map();
 
-// 按 order 排序的列
+// 按 order order 字段排序的列列表
 const sortedColumns = computed(() => {
   return [...columnStore.columns].sort((a, b) => a.order - b.order);
 });
 
-// 获取列的任务
+/**
+ * 获取指定列的任务列表
+ * 过滤掉子任务 (parentId 存在) 和非当前项目的任务
+ */
 function getColumnTasks(columnId: string): Task[] {
   return taskStore.tasks
     .filter(t => 
@@ -216,21 +221,27 @@ function getColumnTaskCount(columnId: string) {
   return getColumnTasks(columnId).length;
 }
 
-// 初始化 Sortable
+/**
+ * 初始化 SortableJS 拖拽实例
+ * 分为两部分：
+ * 1. 列排序 (Column Reordering)
+ * 2. 任务排序 (Task Reordering) - 支持跨列拖拽
+ */
 function initSortables() {
-  // 列排序
+  // 1. 初始化列排序
   if (columnsRef.value && !columnSortable) {
     columnSortable = Sortable.create(columnsRef.value, {
       animation: 250,
       easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
-      handle: '.column-drag-handle',
+      handle: '.column-drag-handle', // 只有拖拽此句柄才能移动列
       draggable: '.kanban-column',
-      ghostClass: 'column-ghost',
-      chosenClass: 'column-chosen',
-      dragClass: 'column-drag',
-      forceFallback: true, // 修复 macOS 拖拽兼容性
-      fallbackOnBody: true, // 确保拖拽层级正确
+      ghostClass: 'column-ghost', // 拖拽时占位符样式
+      chosenClass: 'column-chosen', // 选中项样式
+      dragClass: 'column-drag', // 拖拽中样式
+      forceFallback: true, // 强制使用 HTML5 DnD fallback，修复 macOS WebKit 兼容性
+      fallbackOnBody: true, // 确保拖拽时元素层级脱离容器，防止被遮挡
       onEnd: (evt) => {
+        // 拖拽结束：计算新顺序并更新 Store
         if (evt.oldIndex !== undefined && evt.newIndex !== undefined && evt.oldIndex !== evt.newIndex) {
           const columnIds = sortedColumns.value.map(c => c.id);
           const [moved] = columnIds.splice(evt.oldIndex, 1);
@@ -241,24 +252,25 @@ function initSortables() {
     });
   }
 
-  // 任务排序
+  // 2. 初始化任务卡片排序（针对每一列）
   nextTick(() => {
     const containers = document.querySelectorAll('.task-container');
     containers.forEach((container) => {
       const columnId = (container as HTMLElement).dataset.columnId;
+      // 避免重复初始化
       if (!columnId || taskSortables.has(columnId)) return;
 
       const sortable = Sortable.create(container as HTMLElement, {
         animation: 200,
         easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
-        group: 'tasks',
+        group: 'tasks', // 设置相同的 group 允许跨列拖拽！
         draggable: '.task-card',
         ghostClass: 'task-ghost',
         chosenClass: 'task-chosen',
         dragClass: 'task-drag',
-        forceFallback: true, // 修复 macOS 拖拽兼容性
+        forceFallback: true,
         fallbackOnBody: true,
-        swapThreshold: 0.65,
+        swapThreshold: 0.65, // 拖拽交换阈值
         onEnd: (evt) => {
           const taskId = (evt.item as HTMLElement).dataset.taskId;
           const fromColumnId = (evt.from as HTMLElement).dataset.columnId;
@@ -266,18 +278,18 @@ function initSortables() {
           
           if (!taskId || !toColumnId) return;
           
-          // 获取新顺序
+          // 获取目标列的所有任务ID，形成新顺序
           const taskCards = Array.from(evt.to.querySelectorAll('.task-card'));
           const taskIds = taskCards
             .map(el => (el as HTMLElement).dataset.taskId)
             .filter((id): id is string => !!id);
           
-          // 跨列移动
+          // 处理跨列移动逻辑
           if (fromColumnId !== toColumnId) {
             taskStore.moveTask(taskId, toColumnId, evt.newIndex);
           }
           
-          // 更新顺序
+          // 更新目标列内的任务排序
           taskStore.reorderTasks(toColumnId, projectId.value, taskIds);
         },
       });
@@ -378,7 +390,7 @@ function isCompletedColumn(columnId: string) {
   return columnStore.completedColumnId === columnId;
 }
 
-function handleColumnAction(action: 'rename' | 'progressing' | 'completed' | 'delete') {
+async function handleColumnAction(action: 'rename' | 'progressing' | 'completed' | 'delete') {
   if (!columnMenuId.value) return;
   
   const id = columnMenuId.value;
@@ -391,7 +403,9 @@ function handleColumnAction(action: 'rename' | 'progressing' | 'completed' | 'de
   } else if (action === 'completed') {
     columnStore.setCompletedColumnId(id);
   } else if (action === 'delete') {
-    columnStore.deleteColumn(id);
+    if (await confirm(t('common.confirm_delete_column'), undefined, 'error')) {
+      columnStore.deleteColumn(id);
+    }
   }
   
   closeColumnMenu();
@@ -485,7 +499,7 @@ const taskMenuItems = computed(() => {
    return items;
 });
 
-function handleMenuSelect(action: string) {
+async function handleMenuSelect(action: string) {
    const task = taskContextMenu.value?.task;
    if (!task) return;
    
@@ -494,7 +508,9 @@ function handleMenuSelect(action: string) {
    } else if (action === 'restore') {
       taskStore.restoreTask(task.id);
    } else if (action === 'delete-permanently') {
-      taskStore.deleteTask(task.id);
+      if (await confirm(t('common.confirm_delete_permanently'), undefined, 'error')) {
+        taskStore.deleteTask(task.id);
+      }
    } else if (action.startsWith('priority-')) {
       const p = action.replace('priority-', '') as any;
       taskStore.updateTask(task.id, { priority: p });

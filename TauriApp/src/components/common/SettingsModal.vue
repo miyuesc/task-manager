@@ -122,14 +122,15 @@
                   <label class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ t('settings.user_avatar') }}</label>
                   <div class="flex items-center gap-4">
                      <!-- Avatar Preview -->
-                     <div class="w-16 h-16 rounded-full overflow-hidden bg-gradient-to-br from-amber-400 to-orange-500 shrink-0 ring-4 ring-gray-50 dark:ring-zinc-800/50">
+                     <div class="w-16 h-16 rounded-full overflow-hidden shrink-0 ring-4 ring-gray-50 dark:ring-zinc-800/50"
+                          :class="settingsStore.userAvatar ? 'bg-transparent' : 'bg-gradient-to-br from-amber-400 to-orange-500'">
                         <img 
                           v-if="settingsStore.userAvatar" 
                           :src="settingsStore.userAvatar" 
                           class="w-full h-full object-cover"
                         />
                         <div v-else class="w-full h-full flex items-center justify-center text-white text-xl font-bold">
-                           {{ settingsStore.userName.charAt(0).toUpperCase() }}
+                           {{ settingsStore.userName ? settingsStore.userName.charAt(0).toUpperCase() : 'U' }}
                         </div>
                      </div>
                      
@@ -299,6 +300,7 @@ import { useProjectStore } from '@/stores/project';
 import { useColumnStore } from '@/stores/column';
 import { useLabelStore } from '@/stores/label';
 import { useSyncStore } from '@/stores/sync';
+import { useConfirm } from '@/composables/useConfirm';
 
 defineProps<{
   isOpen: boolean;
@@ -315,6 +317,7 @@ const projectStore = useProjectStore();
 const columnStore = useColumnStore();
 const labelStore = useLabelStore();
 const syncStore = useSyncStore();
+const { confirm } = useConfirm();
 
 // Tabs
 const activeTab = ref('general');
@@ -396,7 +399,7 @@ async function importData(e: Event) {
       return;
     }
 
-    if (!confirm(t('settings.confirm_import'))) {
+    if (!await confirm(t('settings.confirm_import'), undefined, 'warning')) {
       return;
     }
 

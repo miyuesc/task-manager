@@ -141,7 +141,7 @@ onUnmounted(() => {
      Enter: 从右移入。
      这是正确的。
   */
-  position: absolute; /* 确保离开动画时不会把其他元素挤下去 */
+  position: fixed; /* 保持 fixed 定位，防止 absolute 导致页面出现滚动条 */
   top: 0;
   right: 0;
   bottom: 0;

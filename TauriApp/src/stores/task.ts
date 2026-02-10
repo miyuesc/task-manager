@@ -16,6 +16,7 @@ export interface Task {
   parentId?: string;
   completed: boolean;
   order: number; // 用于排序
+  location?: string;
   isTrashed?: boolean; // 是否已作废
 }
 
@@ -247,6 +248,22 @@ export const useTaskStore = defineStore(
       });
     }
 
+    // 记录看板卡片中子任务列表展开的任务ID (持久化)
+    const expandedSubtaskIds = ref<string[]>([]);
+
+    function toggleSubtaskExpansion(taskId: string) {
+      const index = expandedSubtaskIds.value.indexOf(taskId);
+      if (index === -1) {
+        expandedSubtaskIds.value.push(taskId);
+      } else {
+        expandedSubtaskIds.value.splice(index, 1);
+      }
+    }
+
+    function isSubtaskExpanded(taskId: string) {
+      return expandedSubtaskIds.value.includes(taskId);
+    }
+
     return {
       tasks,
       progressingTasks,
@@ -254,6 +271,7 @@ export const useTaskStore = defineStore(
       upcomingTasks,
       completedTasks,
       trashedTasks,
+      expandedSubtaskIds,
       getTasksByProject,
       getTasksByColumn,
       getTasksByColumns,
@@ -265,6 +283,8 @@ export const useTaskStore = defineStore(
       restoreTask,
       moveTask,
       reorderTasks,
+      toggleSubtaskExpansion,
+      isSubtaskExpanded,
     };
   },
   {

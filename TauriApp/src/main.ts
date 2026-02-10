@@ -2,6 +2,7 @@ import { createApp } from "vue";
 import { createPinia } from "pinia";
 import piniaPluginPersistedstate from "pinia-plugin-persistedstate";
 import "./style.css";
+import "highlight.js/styles/atom-one-dark.css";
 import App from "./App.vue";
 import router from "./router";
 

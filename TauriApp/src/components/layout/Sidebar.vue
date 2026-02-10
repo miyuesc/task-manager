@@ -1,288 +1,279 @@
 <script setup lang="ts">
-import { ref, nextTick, computed } from 'vue';
+import { ref, computed, nextTick, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
+import Sortable from 'sortablejs';
 import { 
-  CheckSquare,
-  Columns,
-  Calendar, 
-  Plus, 
-  Tag,
-  Settings,
-  CalendarDays,
-  Trash2,
-  Palette,
-  ChevronLeft,
-  ChevronRight,
-  Pencil
+  CheckSquare, Calendar, Clock, 
+  Settings, Plus, Tag, ChevronLeft, ChevronRight,
+  Pencil, Palette, Trash2,
+  Inbox, CheckCircle
 } from 'lucide-vue-next';
 import { useProjectStore } from '@/stores/project';
 import { useLabelStore } from '@/stores/label';
-import { useTaskStore } from '@/stores/task';
 import { useSettingsStore } from '@/stores/settings';
-import { useI18n } from 'vue-i18n';
-const { t } = useI18n();
+import { useConfirm } from '@/composables/useConfirm';
 
-const route = useRoute();
+const { t } = useI18n();
 const router = useRouter();
+const route = useRoute();
+
 const projectStore = useProjectStore();
 const labelStore = useLabelStore();
-const taskStore = useTaskStore();
 const settingsStore = useSettingsStore();
+const { confirm, alert } = useConfirm();
 
-// 获取当前激活的项目视图模式 (默认为 board)
-const activeProjectView = computed(() => {
-  const path = route.path;
-  if (path.includes('/list')) return 'list';
-  if (path.includes('/timeline')) return 'timeline';
-  if (path.includes('/calendar')) return 'calendar';
-  return 'board';
-});
-
-// 侧边栏折叠状态
 const isCollapsed = ref(false);
+const projectsListRef = ref<HTMLElement | null>(null);
+const labelsListRef = ref<HTMLElement | null>(null);
 
-function toggleCollapse() {
-  isCollapsed.value = !isCollapsed.value;
-}
-
-// 编辑状态
-const editingProjectId = ref<string | null>(null);
-const editingLabelId = ref<string | null>(null);
-const editingName = ref('');
-const editInput = ref<HTMLInputElement | null>(null);
-
-// 右键菜单
-const contextMenu = ref<{ type: 'project' | 'label', id: string, x: number, y: number } | null>(null);
-
-// 新增项目/标签
-const isAddingProject = ref(false);
-const isAddingLabel = ref(false);
-const newItemName = ref('');
-const newItemInput = ref<HTMLInputElement | null>(null);
-
-// 颜色选择
-const showColorPicker = ref(false);
-const colorPickerTarget = ref<{ type: 'project' | 'label', id: string } | null>(null);
-
-const colors = [
-  { name: 'blue', bg: 'bg-blue-500', text: 'text-blue-500' },
-  { name: 'red', bg: 'bg-red-500', text: 'text-red-500' },
-  { name: 'green', bg: 'bg-emerald-500', text: 'text-emerald-500' },
-  { name: 'orange', bg: 'bg-orange-500', text: 'text-orange-500' },
-  { name: 'purple', bg: 'bg-purple-500', text: 'text-purple-500' },
-  { name: 'pink', bg: 'bg-pink-500', text: 'text-pink-500' },
-  { name: 'yellow', bg: 'bg-amber-500', text: 'text-amber-500' },
-  { name: 'gray', bg: 'bg-gray-400', text: 'text-gray-400' },
-];
-
+// Navigation
 const navItems = [
-  { name: 'progressing', label: 'Progressing', icon: Columns, path: '/smart/progressing', iconColor: 'text-blue-500' },
-  { name: 'today', label: 'Today', icon: CalendarDays, path: '/smart/today', iconColor: 'text-emerald-500' },
-  { name: 'upcoming', label: 'Upcoming', icon: Calendar, path: '/smart/upcoming', iconColor: 'text-indigo-500' },
-  { name: 'completed', label: 'Completed', icon: CheckSquare, path: '/smart/completed', iconColor: 'text-green-500' },
-  { name: 'trash', label: 'Trash', icon: Trash2, path: '/smart/trash', iconColor: 'text-gray-500' },
+  { name: 'progressing', path: '/smart/progressing', icon: Inbox, iconColor: 'text-blue-500' },
+  { name: 'today', path: '/smart/today', icon: Calendar, iconColor: 'text-green-500' },
+  { name: 'upcoming', path: '/smart/upcoming', icon: Clock, iconColor: 'text-purple-500' },
+  { name: 'completed', path: '/smart/completed', icon: CheckCircle, iconColor: 'text-gray-500' },
+  { name: 'trash', path: '/smart/trash', icon: Trash2, iconColor: 'text-red-500' },
 ];
-
-// 实时计算导航项的任务数量（不包含子任务）
-const navCounts = computed(() => ({
-  progressing: taskStore.progressingTasks.length,
-  today: taskStore.todayTasks.length,
-  upcoming: taskStore.upcomingTasks.length,
-  completed: taskStore.completedTasks.length,
-  trash: taskStore.trashedTasks.length,
-}));
-
-function getNavCount(name: string): number {
-  return navCounts.value[name as keyof typeof navCounts.value] || 0;
-}
 
 function isActive(path: string) {
   return route.path === path;
 }
 
+function getNavCount(_name: string) {
+  // TODO: Implement real counts from taskStore
+  return 0;
+}
+
+// Project Logic
+const isAddingProject = ref(false);
+const newItemName = ref('');
+const newItemInput = ref<HTMLInputElement | null>(null);
+const editingProjectId = ref<string | null>(null);
+const editingName = ref('');
+const editInput = ref<HTMLInputElement | null>(null);
+
+const activeProjectView = computed(() => {
+    const parts = route.path.split('/');
+    if (parts.includes('project') && parts.length >= 4) {
+        return parts[3]; 
+    }
+    return 'board'; 
+});
+
 function isProjectActive(id: string) {
-  return route.path.startsWith(`/project/${id}`);
+    return route.path.includes(`/project/${id}`);
 }
 
-function isLabelActive(id: string) {
-  return route.path === `/label/${id}`;
-}
-
-function getColorClass(color: string, type: 'bg' | 'text' = 'bg') {
-  const colorMap: Record<string, { bg: string, text: string }> = {
-    'blue': { bg: 'bg-blue-500', text: 'text-blue-500' },
-    'red': { bg: 'bg-red-500', text: 'text-red-500' },
-    'green': { bg: 'bg-emerald-500', text: 'text-emerald-500' },
-    'orange': { bg: 'bg-orange-500', text: 'text-orange-500' },
-    'purple': { bg: 'bg-purple-500', text: 'text-purple-500' },
-    'pink': { bg: 'bg-pink-500', text: 'text-pink-500' },
-    'yellow': { bg: 'bg-amber-500', text: 'text-amber-500' },
-    'gray': { bg: 'bg-gray-400', text: 'text-gray-400' },
-    'cyan': { bg: 'bg-cyan-500', text: 'text-cyan-500' },
-    'indigo': { bg: 'bg-indigo-500', text: 'text-indigo-500' },
-  };
-  return colorMap[color]?.[type] || (type === 'bg' ? 'bg-gray-400' : 'text-gray-400');
-}
-
-// 双击编辑项目 - 选中所有文本
-function startEditProject(project: { id: string, name: string }) {
-  if (isCollapsed.value) return; // 折叠时不允许编辑
-  editingProjectId.value = project.id;
-  editingName.value = project.name;
-  nextTick(() => {
-    if (editInput.value) {
-      editInput.value.focus();
-      editInput.value.select();
-    }
-  });
-}
-
-function saveProjectName() {
-  if (editingProjectId.value && editingName.value.trim()) {
-    projectStore.updateProject(editingProjectId.value, { name: editingName.value.trim() });
-  }
-  editingProjectId.value = null;
-}
-
-// 双击编辑标签 - 选中所有文本
-function startEditLabel(label: { id: string, name: string }) {
-  if (isCollapsed.value) return;
-  editingLabelId.value = label.id;
-  editingName.value = label.name;
-  nextTick(() => {
-    if (editInput.value) {
-      editInput.value.focus();
-      editInput.value.select();
-    }
-  });
-}
-
-function saveLabelName() {
-  if (editingLabelId.value && editingName.value.trim()) {
-    labelStore.updateLabel(editingLabelId.value, { name: editingName.value.trim() });
-  }
-  editingLabelId.value = null;
-}
-
-// 右键菜单
-function showContextMenu(event: MouseEvent, type: 'project' | 'label', id: string) {
-  event.preventDefault();
-  contextMenu.value = { type, id, x: event.clientX, y: event.clientY };
-}
-
-function closeContextMenu() {
-  contextMenu.value = null;
-  showColorPicker.value = false;
-}
-
-function handleContextAction(action: 'rename' | 'color' | 'delete') {
-  if (!contextMenu.value) return;
-  
-  const { type, id } = contextMenu.value;
-  
-  if (action === 'rename') {
-    if (type === 'project') {
-      const project = projectStore.projects.find(p => p.id === id);
-      if (project) startEditProject(project);
-    } else {
-      const label = labelStore.labels.find(l => l.id === id);
-      if (label) startEditLabel(label);
-    }
-  } else if (action === 'color') {
-    colorPickerTarget.value = { type, id };
-    showColorPicker.value = true;
-  } else if (action === 'delete') {
-    if (type === 'project') {
-      projectStore.deleteProject(id);
-    } else {
-      labelStore.deleteLabel(id);
-    }
-  }
-  
-  contextMenu.value = null;
-}
-
-function selectColor(color: string) {
-  if (!colorPickerTarget.value) return;
-  
-  const { type, id } = colorPickerTarget.value;
-  if (type === 'project') {
-    projectStore.updateProject(id, { color });
-  } else {
-    labelStore.updateLabel(id, { color });
-  }
-  
-  showColorPicker.value = false;
-  colorPickerTarget.value = null;
-}
-
-// 新增项目 - 选中所有文本
 function startAddProject() {
-  if (isCollapsed.value) {
-    isCollapsed.value = false;
-    nextTick(() => startAddProject());
-    return;
-  }
-  isAddingProject.value = true;
-  newItemName.value = 'New Project';
-  nextTick(() => {
-    if (newItemInput.value) {
-      newItemInput.value.focus();
-      newItemInput.value.select();
-    }
-  });
-}
-
-function confirmAddProject() {
-  if (newItemName.value.trim()) {
-    projectStore.addProject(newItemName.value.trim());
-  }
-  isAddingProject.value = false;
-  newItemName.value = '';
+    isAddingProject.value = true;
+    newItemName.value = '';
+    nextTick(() => newItemInput.value?.focus());
 }
 
 function cancelAddProject() {
-  isAddingProject.value = false;
-  newItemName.value = '';
+    isAddingProject.value = false;
+    newItemName.value = '';
 }
 
-// 新增标签 - 选中所有文本
-function startAddLabel() {
-  if (isCollapsed.value) {
-    isCollapsed.value = false;
-    nextTick(() => startAddLabel());
-    return;
-  }
-  isAddingLabel.value = true;
-  newItemName.value = 'New Label';
-  nextTick(() => {
-    if (newItemInput.value) {
-      newItemInput.value.focus();
-      newItemInput.value.select();
+async function confirmAddProject() {
+    const name = newItemName.value.trim();
+    if (!name) {
+        cancelAddProject();
+        return;
     }
-  });
+    
+    if (projectStore.projects.some(p => p.name === name)) {
+        await alert(t('common.name_exists'), undefined, 'warning');
+        return;
+    }
+
+    // Default color blue
+    projectStore.addProject(name, 'blue');
+    cancelAddProject();
 }
 
-function confirmAddLabel() {
-  if (newItemName.value.trim()) {
-    labelStore.addLabel(newItemName.value.trim());
-  }
-  isAddingLabel.value = false;
-  newItemName.value = '';
+function startEditProject(project: any) {
+    editingProjectId.value = project.id;
+    editingName.value = project.name;
+    nextTick(() => editInput.value?.focus());
+}
+
+function saveProjectName() {
+    if (editingProjectId.value && editingName.value.trim()) {
+        projectStore.updateProject(editingProjectId.value, { name: editingName.value.trim() });
+    }
+    editingProjectId.value = null;
+}
+
+// Label Logic
+const isAddingLabel = ref(false);
+const editingLabelId = ref<string | null>(null);
+
+function isLabelActive(id: string) {
+    return route.path.includes(`/label/${id}`);
+}
+
+function startAddLabel() {
+    isAddingLabel.value = true;
+    newItemName.value = '';
+    nextTick(() => newItemInput.value?.focus());
 }
 
 function cancelAddLabel() {
-  isAddingLabel.value = false;
-  newItemName.value = '';
+    isAddingLabel.value = false;
+    newItemName.value = '';
 }
 
-// 点击其他区域关闭菜单
+// 确认添加标签
+async function confirmAddLabel() {
+  const name = newItemName.value.trim();
+  if (!name) {
+    cancelAddLabel();
+    return;
+  }
+
+  if (labelStore.labels.some(l => l.name === name)) {
+    await alert(t('common.name_exists'), undefined, 'warning');
+    return;
+  }
+
+  labelStore.addLabel(name, 'gray');
+  cancelAddLabel();
+}
+
+function startEditLabel(label: any) {
+    editingLabelId.value = label.id;
+    editingName.value = label.name;
+    nextTick(() => editInput.value?.focus());
+}
+
+function saveLabelName() {
+    if (editingLabelId.value && editingName.value.trim()) {
+        labelStore.updateLabel(editingLabelId.value, { name: editingName.value.trim() });
+    }
+    editingLabelId.value = null;
+}
+
+// Context Menu
+const contextMenu = ref<{x: number, y: number, type: 'project'|'label', id: string} | null>(null);
+
+function showContextMenu(e: MouseEvent, type: 'project'|'label', id: string) {
+    e.preventDefault();
+    contextMenu.value = {
+        x: e.clientX,
+        y: e.clientY,
+        type,
+        id
+    };
+}
+
 function handleGlobalClick() {
-  closeContextMenu();
+    contextMenu.value = null;
+    showColorPicker.value = false;
+}
+
+async function handleContextAction(action: string) {
+    if (!contextMenu.value) return;
+    const { type, id } = contextMenu.value;
+
+    if (action === 'rename') {
+        if (type === 'project') {
+             const proj = projectStore.projects.find(p => p.id === id);
+             if (proj) startEditProject(proj);
+        } else {
+             const lbl = labelStore.labels.find(l => l.id === id);
+             if (lbl) startEditLabel(lbl);
+        }
+    } else if (action === 'color') {
+        colorPickerTarget.value = { type, id };
+        showColorPicker.value = true;
+    } else if (action === 'delete') {
+        const msg = type === 'project' ? t('common.confirm_delete_project') : t('common.confirm_delete_label');
+        if (await confirm(msg, undefined, 'error')) {
+            if (type === 'project') projectStore.deleteProject(id);
+            else labelStore.deleteLabel(id);
+            if (route.path.includes(id)) router.push('/');
+        }
+    }
+    contextMenu.value = null;
+}
+
+// Color Picker
+const showColorPicker = ref(false);
+const colorPickerTarget = ref<{type: 'project'|'label', id: string} | null>(null);
+const colors = [
+    { name: 'red', bg: 'bg-red-500' },
+    { name: 'orange', bg: 'bg-orange-500' },
+    { name: 'yellow', bg: 'bg-amber-500' },
+    { name: 'green', bg: 'bg-green-500' },
+    { name: 'blue', bg: 'bg-blue-500' },
+    { name: 'purple', bg: 'bg-purple-500' },
+    { name: 'pink', bg: 'bg-pink-500' },
+    { name: 'gray', bg: 'bg-gray-500' },
+];
+
+function selectColor(color: string) {
+    if (!colorPickerTarget.value) return;
+    const { type, id } = colorPickerTarget.value;
+    if (type === 'project') {
+        projectStore.updateProject(id, { color });
+    } else {
+        labelStore.updateLabel(id, { color });
+    }
+    showColorPicker.value = false;
+    colorPickerTarget.value = null;
+}
+
+function getColorClass(color: string, type: 'bg' | 'text') {
+    const prefix = type === 'bg' ? 'bg' : 'text';
+    const shade = '500';
+    return `${prefix}-${color}-${shade}`;
+}
+
+function toggleCollapse() {
+    isCollapsed.value = !isCollapsed.value;
 }
 
 // 侧边栏宽度类
 const sidebarWidth = computed(() => isCollapsed.value ? 'w-16' : 'w-60');
+
+// 拖拽排序 (SortableJS)
+onMounted(() => {
+  if (projectsListRef.value) {
+    Sortable.create(projectsListRef.value, {
+      animation: 150,
+      ghostClass: 'bg-gray-100',
+      draggable: '[data-id]', // Only drag items with data-id
+      handle: '.group', // Allow dragging anywhere on the item
+      onEnd: () => {
+        if (!projectsListRef.value) return;
+        const newOrderIds = Array.from(projectsListRef.value.children)
+          .map((el) => (el as HTMLElement).getAttribute('data-id'))
+          .filter((id): id is string => !!id);
+        
+        projectStore.reorderProjects(newOrderIds);
+      }
+    });
+  }
+
+  if (labelsListRef.value) {
+    Sortable.create(labelsListRef.value, {
+      animation: 150,
+      ghostClass: 'bg-gray-100',
+      draggable: '[data-id]',
+      handle: '.group',
+      onEnd: () => {
+        if (!labelsListRef.value) return;
+        const newOrderIds = Array.from(labelsListRef.value.children)
+          .map((el) => (el as HTMLElement).getAttribute('data-id'))
+          .filter((id): id is string => !!id);
+        
+        labelStore.reorderLabels(newOrderIds);
+      }
+    });
+  }
+});
 </script>
 
 <template>
@@ -331,20 +322,7 @@ const sidebarWidth = computed(() => isCollapsed.value ? 'w-16' : 'w-60');
             <Plus class="w-4 h-4" />
           </button>
         </div>
-        <div class="space-y-0.5">
-          <!-- 新增项目输入框 -->
-          <div v-if="isAddingProject" class="flex items-center gap-3 px-3 h-9">
-            <span class="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0"></span>
-            <input 
-              ref="newItemInput"
-              v-model="newItemName"
-              @keydown.enter="confirmAddProject"
-              @keydown.escape="cancelAddProject"
-              @blur="confirmAddProject"
-              class="flex-1 min-w-0 text-sm bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded px-2 h-7 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
+        <div class="space-y-0.5" ref="projectsListRef">
           <template v-for="project in projectStore.projects" :key="project.id">
             <!-- 编辑模式 -->
             <div 
@@ -362,20 +340,34 @@ const sidebarWidth = computed(() => isCollapsed.value ? 'w-16' : 'w-60');
               />
             </div>
             <!-- 正常显示 -->
-            <router-link 
-              v-else
-              :to="`/project/${project.id}/${activeProjectView}`"
-              @dblclick="startEditProject(project)"
-              @contextmenu="showContextMenu($event, 'project', project.id)"
-              class="flex items-center gap-3 px-3 h-9 text-sm font-medium rounded-lg transition-all group"
-              :class="isProjectActive(project.id) 
-                ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' 
-                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800/50'"
-            >
-              <span class="w-2.5 h-2.5 rounded-full shrink-0 transition-transform group-hover:scale-110" :class="getColorClass(project.color, 'bg')"></span>
-              <span class="truncate">{{ project.name }}</span>
-            </router-link>
+            <div v-else :data-id="project.id">
+              <router-link 
+                :to="`/project/${project.id}/${activeProjectView}`"
+                @dblclick="startEditProject(project)"
+                @contextmenu="showContextMenu($event, 'project', project.id)"
+                class="flex items-center gap-3 px-3 h-9 text-sm font-medium rounded-lg transition-all group"
+                :class="isProjectActive(project.id) 
+                  ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' 
+                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800/50'"
+              >
+                <span class="w-2.5 h-2.5 rounded-full shrink-0 transition-transform group-hover:scale-110" :class="getColorClass(project.color, 'bg')"></span>
+                <span class="truncate">{{ project.name }}</span>
+              </router-link>
+            </div>
           </template>
+
+          <!-- 新增项目输入框 (Moved to bottom) -->
+          <div v-if="isAddingProject" class="flex items-center gap-3 px-3 h-9">
+            <span class="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0"></span>
+            <input 
+              ref="newItemInput"
+              v-model="newItemName"
+              @keydown.enter="confirmAddProject"
+              @keydown.escape="cancelAddProject"
+              @blur="confirmAddProject"
+              class="flex-1 min-w-0 text-sm bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded px-2 h-7 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
         </div>
       </div>
 
@@ -406,20 +398,7 @@ const sidebarWidth = computed(() => isCollapsed.value ? 'w-16' : 'w-60');
             <Plus class="w-4 h-4" />
           </button>
         </div>
-        <div class="space-y-0.5">
-          <!-- 新增标签输入框 -->
-          <div v-if="isAddingLabel" class="flex items-center gap-3 px-3 h-9">
-            <Tag class="w-4 h-4 text-gray-400 shrink-0" />
-            <input 
-              ref="newItemInput"
-              v-model="newItemName"
-              @keydown.enter="confirmAddLabel"
-              @keydown.escape="cancelAddLabel"
-              @blur="confirmAddLabel"
-              class="flex-1 min-w-0 text-sm bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded px-2 h-7 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
+        <div class="space-y-0.5" ref="labelsListRef">
           <template v-for="label in labelStore.labels" :key="label.id">
             <!-- 编辑模式 -->
             <div 
@@ -437,20 +416,34 @@ const sidebarWidth = computed(() => isCollapsed.value ? 'w-16' : 'w-60');
               />
             </div>
             <!-- 正常显示 -->
-            <router-link 
-              v-else
-              :to="`/label/${label.id}`"
-              @dblclick="startEditLabel(label)"
-              @contextmenu="showContextMenu($event, 'label', label.id)"
-              class="flex items-center gap-3 px-3 h-9 text-sm font-medium rounded-lg transition-all group"
-              :class="isLabelActive(label.id) 
-                ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' 
-                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800/50'"
-            >
-              <Tag class="w-4 h-4 shrink-0 transition-transform group-hover:scale-110" :class="getColorClass(label.color, 'text')" />
-              <span class="truncate">{{ label.name }}</span>
-            </router-link>
+            <div v-else :data-id="label.id">
+              <router-link 
+                :to="`/label/${label.id}`"
+                @dblclick="startEditLabel(label)"
+                @contextmenu="showContextMenu($event, 'label', label.id)"
+                class="flex items-center gap-3 px-3 h-9 text-sm font-medium rounded-lg transition-all group"
+                :class="isLabelActive(label.id) 
+                  ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' 
+                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800/50'"
+              >
+                <Tag class="w-4 h-4 shrink-0 transition-transform group-hover:scale-110" :class="getColorClass(label.color, 'text')" />
+                <span class="truncate">{{ label.name }}</span>
+              </router-link>
+            </div>
           </template>
+
+          <!-- 新增标签输入框 (Moved to bottom) -->
+          <div v-if="isAddingLabel" class="flex items-center gap-3 px-3 h-9">
+            <Tag class="w-4 h-4 text-gray-400 shrink-0" />
+            <input 
+              ref="newItemInput"
+              v-model="newItemName"
+              @keydown.enter="confirmAddLabel"
+              @keydown.escape="cancelAddLabel"
+              @blur="confirmAddLabel"
+              class="flex-1 min-w-0 text-sm bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded px-2 h-7 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
         </div>
       </div>
 
@@ -472,7 +465,6 @@ const sidebarWidth = computed(() => isCollapsed.value ? 'w-16' : 'w-60');
     </nav>
 
     <!-- Bottom Actions -->
-    <!-- Bottom Actions -->
     <div class="border-t border-gray-100 dark:border-zinc-800 shrink-0">
       <!-- 展开状态：水平布局 -->
       <div v-if="!isCollapsed" class="flex items-center h-12 px-2">
@@ -487,8 +479,6 @@ const sidebarWidth = computed(() => isCollapsed.value ? 'w-16' : 'w-60');
         <!-- 分割线 -->
         <div class="w-px h-5 bg-gray-200 dark:bg-zinc-700 mx-2"></div>
         
-
-
         <!-- 设置按钮（右侧） -->
         <button 
           @click="settingsStore.openSettings()"
@@ -508,8 +498,6 @@ const sidebarWidth = computed(() => isCollapsed.value ? 'w-16' : 'w-60');
         >
           <ChevronRight class="w-5 h-5" />
         </button>
-
-
       </div>
     </div>
   </aside>

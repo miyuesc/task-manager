@@ -23,7 +23,7 @@
         >
           <ChevronRight 
             class="w-3 h-3 transition-transform" 
-            :class="{ 'rotate-90': expandedIds.has(subtask.id) }" 
+            :class="{ 'rotate-90': taskStore.isSubtaskExpanded(subtask.id) }" 
           />
         </button>
         <div v-else class="w-4"></div>
@@ -32,7 +32,7 @@
         <span 
           @click.stop="openSubtask(subtask.id)"
           class="flex-1 cursor-pointer hover:text-blue-500 transition-colors truncate"
-          :class="{ 'line-through text-gray-400': subtask.completed, 'text-gray-600 dark:text-gray-400': !subtask.completed }"
+          :class="{ 'line-through text-gray-400 dark:text-gray-500 decoration-gray-400': subtask.completed, 'text-gray-600 dark:text-gray-400': !subtask.completed }"
           :title="subtask.title"
         >
           {{ subtask.title }}
@@ -41,21 +41,10 @@
 
       <!-- Recursive Subtasks -->
       <SubtaskList 
-        v-if="expandedIds.has(subtask.id)"
+        v-if="taskStore.isSubtaskExpanded(subtask.id)"
         :parent-id="subtask.id"
         :level="level + 1"
       />
-
-      <!-- 添加子任务按钮 -->
-      <button 
-        v-if="expandedIds.has(subtask.id)"
-        @click.stop="openNewSubtask(subtask.id)"
-        class="text-xs text-blue-500 hover:text-blue-600 flex items-center gap-1 font-medium py-1 mt-1 ml-1 pl-[level * 12 + 16]px"
-        :style="{ paddingLeft: `${(level + 1) * 12 + 4}px` }"
-      >
-        <Plus class="w-3 h-3" />
-        Add subtask
-      </button>
     </div>
   </div>
 </template>
@@ -77,20 +66,10 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const taskStore = useTaskStore();
-const { openTask: openTaskModal, pushTask, openNewTask } = useTaskModal(); 
+const { openTask: openTaskModal, pushTask } = useTaskModal(); 
 
-function openNewSubtask(parentId: string) {
-  const task = taskStore.tasks.find(t => t.id === parentId);
-  if (!task) return;
-  
-  openNewTask({
-    projectId: task.projectId,
-    columnId: task.columnId,
-    parentId: parentId
-  });
-}
+
 // State
-const expandedIds = ref(new Set<string>());
 const subtaskContainerRef = ref<HTMLElement | null>(null);
 let sortableInstance: Sortable | null = null;
 
@@ -160,12 +139,7 @@ function hasChildren(taskId: string) {
 }
 
 function toggleExpand(taskId: string) {
-  if (expandedIds.value.has(taskId)) {
-    expandedIds.value.delete(taskId);
-  } else {
-    expandedIds.value.add(taskId);
-    // 展开后，内部的子任务列表也需要初始化 Sortable
-  }
+  taskStore.toggleSubtaskExpansion(taskId);
 }
 
 function toggleSubtaskCompleted(subtask: Task) {

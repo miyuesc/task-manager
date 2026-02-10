@@ -5,6 +5,7 @@
       :is-open="settingsStore.isSettingsOpen" 
       @close="settingsStore.closeSettings()" 
     />
+    <ConfirmDialog />
   </AppLayout>
 </template>
 
@@ -13,12 +14,29 @@ import { onMounted, onUnmounted, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import AppLayout from '@/layouts/AppLayout.vue';
 import SettingsModal from '@/components/common/SettingsModal.vue';
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue';
 import { useSettingsStore } from '@/stores/settings';
 import { useSyncStore } from '@/stores/sync';
 
 const { locale } = useI18n();
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
+
+// Global Event Handlers
+function handleContextMenu(e: MouseEvent) {
+  const target = e.target as HTMLElement;
+  if (['INPUT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable) {
+    return;
+  }
+  e.preventDefault();
+}
+
+function handleDragStart(e: DragEvent) {
+  const target = e.target as HTMLElement;
+  if (target.tagName === 'A' || target.closest('a')) {
+    e.preventDefault();
+  }
+}
 
 // Zoom Shortcut Logic
 function handleKeydown(e: KeyboardEvent) {
@@ -57,8 +75,6 @@ watch(
 
 onMounted(() => {
   // Initialize settings
-  // Trust store persistence via pinia-plugin-persistedstate which runs before mount usually.
-  // But we need to call init() to apply styles.
   settingsStore.init();
   
   // Initialize Cloud Sync if configured
@@ -68,9 +84,13 @@ onMounted(() => {
   locale.value = settingsStore.locale;
 
   window.addEventListener('keydown', handleKeydown);
+  window.addEventListener('contextmenu', handleContextMenu);
+  window.addEventListener('dragstart', handleDragStart);
 });
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown);
+  window.removeEventListener('contextmenu', handleContextMenu);
+  window.removeEventListener('dragstart', handleDragStart);
 });
 </script>

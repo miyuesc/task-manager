@@ -66,7 +66,7 @@
       </div>
 
       <!-- Subtasks Section (always show progress if has subtasks) -->
-      <div v-if="subtasks.length > 0" class="mt-3 ml-6">
+      <div v-if="subtasks.length > 0" class="mt-3">
         <!-- Subtask Header: Toggle + Progress Ring -->
         <div class="flex items-center gap-2" @click.stop="toggleSubtaskExpand">
           <!-- 圆环进度指示器 -->
@@ -102,18 +102,7 @@
         </div>
 
         <!-- Subtasks List -->
-        <div v-if="isSubtaskExpanded" class="mt-2 pl-1">
-          <SubtaskList :parent-id="task.id" />
-          
-          <!-- 添加子任务按钮 -->
-          <button 
-            @click.stop
-            class="text-xs text-blue-500 hover:text-blue-600 flex items-center gap-1 font-medium py-1 mt-1 ml-1"
-          >
-            <Plus class="w-3 h-3" />
-            Add subtask
-          </button>
-        </div>
+        <SubtaskList v-if="isSubtaskExpanded" class="mt-2 pl-1" :parent-id="task.id" />
       </div>
     </div>
   </div>
@@ -123,7 +112,7 @@
 import { computed, ref } from 'vue';
 import { Task, useTaskStore } from '@/stores/task';
 import { useColumnStore } from '@/stores/column';
-import { ChevronDown, Clock, Plus } from 'lucide-vue-next';
+import { ChevronDown, Clock } from 'lucide-vue-next';
 import { useI18n } from 'vue-i18n';
 import SubtaskList from './SubtaskList.vue'; // Import SubtaskList
 
@@ -136,7 +125,7 @@ const props = defineProps<{
 const taskStore = useTaskStore();
 const columnStore = useColumnStore();
 const isExpanded = ref(false);
-const isSubtaskExpanded = ref(false);
+const isSubtaskExpanded = computed(() => taskStore.expandedSubtaskIds.includes(props.task.id));
 
 const subtasks = computed(() => taskStore.getSubtasks(props.task.id));
 const completedSubtasks = computed(() => {
@@ -183,7 +172,7 @@ function toggleExpand() {
 
 // 展开/收起子任务
 function toggleSubtaskExpand() {
-  isSubtaskExpanded.value = !isSubtaskExpanded.value;
+  taskStore.toggleSubtaskExpansion(props.task.id);
 }
 
 // 切换任务完成状态

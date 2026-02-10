@@ -57,6 +57,15 @@ export const useProjectStore = defineStore(
       return projects.value.find((p) => p.id === id);
     }
 
+    function reorderProjects(newOrderIds: string[]) {
+      const reordered = newOrderIds
+        .map((id) => projects.value.find((p) => p.id === id))
+        .filter((p): p is Project => !!p);
+      if (reordered.length === projects.value.length) {
+        projects.value = reordered;
+      }
+    }
+
     return {
       projects,
       activeProjectId,
@@ -64,6 +73,7 @@ export const useProjectStore = defineStore(
       updateProject,
       deleteProject,
       getProject,
+      reorderProjects,
     };
   },
   {

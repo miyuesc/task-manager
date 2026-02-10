@@ -53,12 +53,22 @@ export const useLabelStore = defineStore(
       return labels.value.find((l) => l.id === id);
     }
 
+    function reorderLabels(newOrderIds: string[]) {
+      const reordered = newOrderIds
+        .map((id) => labels.value.find((l) => l.id === id))
+        .filter((l): l is Label => !!l);
+      if (reordered.length === labels.value.length) {
+        labels.value = reordered;
+      }
+    }
+
     return {
       labels,
       addLabel,
       updateLabel,
       deleteLabel,
       getLabel,
+      reorderLabels,
     };
   },
   {

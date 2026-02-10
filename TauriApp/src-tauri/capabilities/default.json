@@ -7,6 +7,9 @@
     "core:default",
     "opener:default",
     "fs:default",
+    "fs:allow-write-text-file",
+    "fs:allow-read-text-file",
+    "fs:allow-exists",
     "dialog:default",
     {
       "identifier": "fs:scope",

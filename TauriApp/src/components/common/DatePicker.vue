@@ -15,7 +15,7 @@
       <Transition name="fade-scale">
         <div 
           v-if="isOpen"
-          class="fixed z-50 bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-gray-200 dark:border-zinc-800 p-5 min-w-[300px]"
+          class="fixed z-[100] bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-gray-200 dark:border-zinc-800 p-5 min-w-[300px]"
           :style="dropdownStyle"
           @click.stop
         >
@@ -151,6 +151,7 @@ const calendarDays = computed(() => {
 
 function togglePicker() {
   isOpen.value = !isOpen.value;
+  
   if (isOpen.value) {
     updateDropdownPosition();
     // 如果有选中日期，跳转到该月份

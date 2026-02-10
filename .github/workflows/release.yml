@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest]
+        platform: [macos-latest, windows-latest]
 
     runs-on: ${{ matrix.platform }}
 
@@ -44,6 +44,6 @@ jobs:
           projectPath: TauriApp
           tagName: v__VERSION__
           releaseName: "Task Flow v__VERSION__"
-          releaseBody: "Task Flow Release - macOS (M1/M2/M3)"
+          releaseBody: "Task Flow Release - macOS (Apple Silicon) & Windows (x64)"
           releaseDraft: true
           prerelease: false

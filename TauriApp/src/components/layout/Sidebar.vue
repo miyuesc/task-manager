@@ -242,10 +242,13 @@ const sidebarWidth = computed(() => isCollapsed.value ? 'w-16' : 'w-60');
 onMounted(() => {
   if (projectsListRef.value) {
     Sortable.create(projectsListRef.value, {
-      animation: 150,
+      animation: 250,
+      easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
       ghostClass: 'bg-gray-100',
       draggable: '[data-id]', // Only drag items with data-id
       handle: '.group', // Allow dragging anywhere on the item
+      forceFallback: true, // 强制使用 HTML5 DnD fallback，修复 macOS WebKit 兼容性
+      fallbackOnBody: true, // 确保拖拽时元素层级脱离容器，防止被遮挡
       onEnd: () => {
         if (!projectsListRef.value) return;
         const newOrderIds = Array.from(projectsListRef.value.children)
@@ -259,10 +262,13 @@ onMounted(() => {
 
   if (labelsListRef.value) {
     Sortable.create(labelsListRef.value, {
-      animation: 150,
+      animation: 250,
+      easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
       ghostClass: 'bg-gray-100',
       draggable: '[data-id]',
       handle: '.group',
+      forceFallback: true, // 强制使用 HTML5 DnD fallback，修复 macOS WebKit 兼容性
+      fallbackOnBody: true, // 确保拖拽时元素层级脱离容器，防止被遮挡
       onEnd: () => {
         if (!labelsListRef.value) return;
         const newOrderIds = Array.from(labelsListRef.value.children)
@@ -282,8 +288,8 @@ onMounted(() => {
     @click="handleGlobalClick"
   >
     <!-- Logo Area -->
-    <div class="h-14 flex items-center px-4 cursor-pointer shrink-0" @click="router.push('/')">
-      <div class="flex items-center gap-2.5">
+    <div class="h-14 flex items-center px-4 shrink-0" data-tauri-drag-region>
+      <div class="flex items-center gap-2.5 cursor-pointer transition-opacity hover:opacity-80" @click="router.push('/')">
         <div class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center shrink-0">
           <CheckSquare class="w-4 h-4 text-white" />
         </div>

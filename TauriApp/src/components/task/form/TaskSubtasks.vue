@@ -3,7 +3,7 @@
      <div class="flex items-center justify-between mb-3">
        <div class="flex items-center gap-2">
          <ListTodo class="w-4 h-4 text-gray-500" />
-         <h3 class="text-sm font-medium text-gray-900 dark:text-white">{{ t('task.subtasks') }}</h3>
+         <h3 class="text-sm font-medium text-gray-900 dark:text-gray-50">{{ t('task.subtasks') }}</h3>
          <span class="text-xs text-gray-500 bg-gray-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full">
            {{ completedCount }}/{{ subtasks.length }}
          </span>

@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { SYSTEM_COLORS } from "@/constants/resources";
 
 export interface Label {
   id: string;
@@ -7,17 +8,7 @@ export interface Label {
   color: string;
 }
 
-const COLORS = [
-  "red",
-  "orange",
-  "yellow",
-  "green",
-  "blue",
-  "indigo",
-  "purple",
-  "pink",
-  "gray",
-];
+const COLORS = SYSTEM_COLORS.map((c) => c.id);
 
 export const useLabelStore = defineStore(
   "labels",

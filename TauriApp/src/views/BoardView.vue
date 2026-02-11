@@ -19,12 +19,12 @@
               @keydown.enter="saveColumnName"
               @keydown.escape="cancelEditColumn"
               @blur="saveColumnName"
-              class="text-sm font-semibold bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 focus:ring-2 focus:ring-blue-500 rounded px-1.5 py-0.5 text-gray-900 dark:text-white min-w-0 w-32"
+              class="text-sm font-semibold bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 focus:ring-2 focus:ring-blue-500 rounded px-1.5 py-0.5 text-gray-900 dark:text-gray-50 min-w-0 w-32"
             />
             <h3 
               v-else
               @dblclick="startEditColumn(column)"
-              class="font-semibold text-gray-900 dark:text-white text-sm px-1.5 py-0.5"
+              class="font-semibold text-gray-900 dark:text-gray-50 text-sm px-1.5 py-0.5"
             >
               {{ column.name }}
             </h3>
@@ -81,7 +81,7 @@
           @keydown.enter="confirmAddColumn"
           @keydown.escape="cancelAddColumn"
           @blur="confirmAddColumn"
-          class="w-full text-sm bg-transparent border-none focus:ring-0 p-0 text-gray-900 dark:text-white placeholder-gray-400"
+          class="w-full text-sm bg-transparent border-none focus:ring-0 p-0 text-gray-900 dark:text-gray-50 placeholder-gray-400"
           placeholder="Column name..."
         />
       </div>

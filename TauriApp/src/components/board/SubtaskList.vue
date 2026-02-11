@@ -80,7 +80,7 @@ const props = withDefaults(defineProps<Props>(), {
   level: 0
 });
 
-const emit = defineEmits<{
+defineEmits<{
   (e: 'context-menu', event: MouseEvent, task: Task): void
 }>();
 

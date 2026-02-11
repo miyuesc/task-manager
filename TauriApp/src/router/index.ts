@@ -25,16 +25,6 @@ const routes: Array<RouteRecordRaw> = [
         name: "ListView",
         component: () => import("../views/ListView.vue"),
       },
-      {
-        path: "calendar",
-        name: "CalendarView",
-        component: () => import("../views/CalendarView.vue"),
-      },
-      {
-        path: "timeline",
-        name: "TimelineView",
-        component: () => import("../views/TimelineView.vue"),
-      },
     ],
   },
   {
@@ -43,9 +33,9 @@ const routes: Array<RouteRecordRaw> = [
     component: () => import("../views/ListView.vue"), // Label views are lists
   },
   {
-    path: "/overview",
+    path: "/overview/:view?",
     name: "Overview",
-    component: () => import("../views/BoardView.vue"),
+    component: () => import("../views/OverviewView.vue"),
   },
 ];
 

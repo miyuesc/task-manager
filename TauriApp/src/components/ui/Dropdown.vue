@@ -19,7 +19,7 @@
     <Transition name="dropdown">
       <div
         v-if="isOpen"
-        class="absolute z-50 mt-2 py-2 px-4 flex flex-col gap-2 bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-gray-200 dark:border-zinc-700 min-w-[200px]"
+        class="absolute z-50 mt-2 py-2 px-4 flex flex-col gap-2 bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-gray-200 dark:border-zinc-700 min-w-max"
         :class="[alignClass, widthClass]"
       >
         <slot name="menu">
@@ -46,7 +46,7 @@
               :class="option.iconClass || 'text-gray-500'"
             />
             <!-- 标签 -->
-            <span class="flex-1">{{ option.label }}</span>
+            <span class="flex-1 whitespace-nowrap">{{ option.label }}</span>
             <!-- 选中标记 -->
             <Check v-if="isSelected(option)" class="w-4 h-4 text-blue-500" />
           </button>

@@ -1,6 +1,6 @@
 <template>
   <div class="flex flex-col h-full bg-white dark:bg-zinc-900 select-none">
-    <!-- Toolbar -->
+    <!-- 工具栏 -->
     <div class="px-6 py-3 border-b border-gray-200 dark:border-zinc-800 flex items-center justify-between shrink-0">
       <div class="flex items-center gap-4">
         <div class="flex items-center bg-white dark:bg-zinc-800 rounded-md border border-gray-200 dark:border-zinc-700 p-0.5 shadow-sm">
@@ -13,22 +13,22 @@
         </div>
         <h2 class="text-lg font-bold text-gray-800 dark:text-gray-200">{{ currentMonthName }} {{ currentYear }}</h2>
         <button @click="goToToday" class="px-3 py-1 text-xs font-semibold bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-700 transition-colors">
-            Today
+            {{ $t('common.today') }}
         </button>
       </div>
     </div>
 
-    <!-- Grid Header -->
+    <!-- 表头 -->
     <div class="grid grid-cols-7 border-b border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shrink-0">
-        <div v-for="day in weekDays" :key="day" class="py-3 text-center text-[11px] font-bold text-gray-400 uppercase tracking-widest">
+        <div v-for="(day, i) in localizedWeekDays" :key="i" class="py-3 text-center text-[11px] font-bold text-gray-400 uppercase tracking-widest">
             {{ day }}
         </div>
     </div>
 
-    <!-- Grid Body -->
+    <!-- 日历网格 -->
     <div class="flex-1 flex flex-col divide-y divide-gray-200 dark:divide-zinc-800 overflow-hidden">
         <div v-for="(week, weekIndex) in calendarWeeks" :key="weekIndex" class="flex-1 flex min-h-[120px] relative">
-            <!-- Background Grid Cells -->
+            <!-- 背景网格 -->
             <div class="absolute inset-0 grid grid-cols-7 divide-x divide-gray-200 dark:divide-zinc-800">
                 <div v-for="(date, dayIndex) in week" :key="dayIndex" 
                     @dblclick="handleDblClick(date)"
@@ -50,9 +50,8 @@
                 </div>
             </div>
 
-            <!-- Task Layers -->
+            <!-- 任务层 -->
             <div class="absolute inset-0 grid grid-cols-7 pointer-events-none pt-10 px-0.5">
-                <!-- We'll render tasks that span across the week or start/end here -->
                 <div v-for="layout in getWeekTaskLayout(week)" :key="layout.task.id"
                     class="absolute pointer-events-auto cursor-pointer mb-1 px-0.5"
                     :style="{
@@ -87,38 +86,53 @@ import { ChevronLeft, ChevronRight } from 'lucide-vue-next';
 import { useTaskStore, Task } from '@/stores/task';
 import { useTaskModal } from '@/composables/useTaskModal';
 import { getLocalDateISOString } from '@/utils/date';
+import { useI18n } from 'vue-i18n';
+import { TaskPriority, PRIORITY_CONFIG } from '@/constants/resources';
 
+const { locale } = useI18n();
 const route = useRoute();
 const taskStore = useTaskStore();
 const { openTask, openNewTask } = useTaskModal();
 
 const currentDate = ref(new Date());
-const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+// 国际化的星期几
+const localizedWeekDays = computed(() => {
+    const loc = locale.value === 'zh' ? 'zh-CN' : 'en-US';
+    const days = [];
+    // 从周一开始
+    for (let i = 1; i <= 7; i++) {
+        // 2024-01-01 是周一
+        const d = new Date(2024, 0, i);
+        days.push(d.toLocaleString(loc, { weekday: 'short' }));
+    }
+    return days;
+});
 
 const currentYear = computed(() => currentDate.value.getFullYear());
 const currentMonth = computed(() => currentDate.value.getMonth());
-const currentMonthName = computed(() => currentDate.value.toLocaleString('default', { month: 'long' }));
+
+// 国际化的月份名
+const currentMonthName = computed(() => {
+    const loc = locale.value === 'zh' ? 'zh-CN' : 'en-US';
+    return currentDate.value.toLocaleString(loc, { month: 'long' });
+});
 
 // 计算日历中显示的所有日期，按周分组
 const calendarWeeks = computed(() => {
     const year = currentYear.value;
     const month = currentMonth.value;
     
-    // 获取当月第一天
     const firstDay = new Date(year, month, 1);
-    // 获取第一天是周几 (0是周日, 1-6是周一到周六)
-    // 我们想要周一开始，所以 0 -> 6, 1 -> 0, 2 -> 1 ...
     const dayOfWeek = firstDay.getDay();
     const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
     
-    // 视图起始日期
     const startDate = new Date(firstDay);
     startDate.setDate(firstDay.getDate() - diff);
     
     const weeks = [];
     let currentIterDate = new Date(startDate);
     
-    // 固定显示 6 周，确保高度一致
     for (let w = 0; w < 6; w++) {
         const week = [];
         for (let d = 0; d < 7; d++) {
@@ -170,17 +184,14 @@ function getTasksForRange(start: Date, end: Date) {
     const endStr = getLocalDateISOString(end);
     
     return taskStore.tasks.filter(t => {
-        // 项目过滤
         if (projectId && t.projectId !== projectId) return false;
         if (t.isTrashed) return false;
 
-        // 任务的实际日期范围
         const taskStart = t.startDate || t.dueDate || '';
         const taskEnd = t.dueDate || t.startDate || '';
         
         if (!taskStart) return false;
         
-        // 检查任务是否与当前范围有交集
         return taskStart <= endStr && taskEnd >= startStr;
     });
 }
@@ -188,7 +199,7 @@ function getTasksForRange(start: Date, end: Date) {
 // 计算某一周的任务布局
 interface TaskLayout {
     task: Task;
-    start: number; // 0-6
+    start: number;
     span: number;
     row: number;
     isStart: boolean;
@@ -204,7 +215,7 @@ function getWeekTaskLayout(week: Date[]): TaskLayout[] {
     
     const tasks = getTasksForRange(weekStart, weekEnd);
     
-const sortedTasks = [...tasks].sort((a, b) => {
+    const sortedTasks = [...tasks].sort((a, b) => {
         const aStart = a.startDate || a.dueDate || '';
         const aEnd = a.dueDate || a.startDate || '';
         const bStart = b.startDate || b.dueDate || '';
@@ -218,13 +229,12 @@ const sortedTasks = [...tasks].sort((a, b) => {
     });
 
     const layouts: TaskLayout[] = [];
-    const rows: (string | null)[][] = []; // 记录每行被占用的情况 [rowIndex][dayIndex]
+    const rows: (string | null)[][] = [];
 
     sortedTasks.forEach(task => {
         const taskStart = task.startDate || task.dueDate || '';
         const taskEnd = task.dueDate || task.startDate || '';
         
-        // 计算在该周内的起始和结束位置
         let startIdx = 0;
         let endIdx = 6;
         
@@ -240,7 +250,6 @@ const sortedTasks = [...tasks].sort((a, b) => {
         
         const span = endIdx - startIdx + 1;
         
-        // 寻找第一个可用的行
         let rowIndex = 0;
         while (true) {
             if (!rows[rowIndex]) rows[rowIndex] = Array(7).fill(null);
@@ -254,7 +263,6 @@ const sortedTasks = [...tasks].sort((a, b) => {
             }
             
             if (isAvailable) {
-                // 占据空间
                 for (let i = startIdx; i <= endIdx; i++) {
                     rows[rowIndex][i] = task.id;
                 }
@@ -266,7 +274,7 @@ const sortedTasks = [...tasks].sort((a, b) => {
                     row: rowIndex,
                     isStart: taskStart >= weekStartStr,
                     isEnd: taskEnd <= weekEndStr,
-                    showTitle: startIdx === 0 || taskStart >= weekStartStr // 第一列或者任务开始日
+                    showTitle: startIdx === 0 || taskStart >= weekStartStr
                 });
                 break;
             }
@@ -282,19 +290,12 @@ function getTaskColorClass(task: Task) {
          return 'bg-gray-100 text-gray-400 border-gray-200 dark:bg-zinc-800 dark:text-gray-500 dark:border-zinc-700 line-through';
     }
     
-    // 如果是单日任务（只有起始日期），我们可以使用不同的样式，但这里暂时遵循用户提到的“任务展示”
-    // 对于贯穿的任务条，通常是有背景色的
-    switch (task.priority) {
-        case 'high': return 'bg-red-500/10 text-red-700 border-red-200 dark:bg-red-900/40 dark:text-red-300 dark:border-red-800/50';
-        case 'medium': return 'bg-yellow-500/10 text-yellow-700 border-yellow-200 dark:bg-yellow-900/40 dark:text-yellow-300 dark:border-yellow-800/50';
-        case 'low': return 'bg-green-500/10 text-green-700 border-green-200 dark:bg-green-900/40 dark:text-green-300 dark:border-green-800/50';
-        default: return 'bg-blue-500/10 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800/50';
-    }
+    const config = PRIORITY_CONFIG[task.priority as TaskPriority];
+    return config ? config.calendarClass : 'bg-blue-500/10 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800/50';
 }
 </script>
 
 <style scoped>
-/* 确保日历能够平滑滚动且内容不溢出 */
 .flex-1 {
     min-height: 0;
 }

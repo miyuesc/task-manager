@@ -27,15 +27,18 @@
             :class="{ 
               'line-through text-gray-500 dark:text-gray-400': task.isTrashed,
               'text-gray-500 dark:text-gray-400': task.completed && !task.isTrashed,
-              'text-gray-900 dark:text-white': !task.completed && !task.isTrashed
+              'text-gray-900 dark:text-gray-50': !task.completed && !task.isTrashed
             }"
           >
             {{ task.title }}
           </p>
-          <!-- Description preview (expanded) -->
-          <p v-if="isExpanded && task.description" class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            {{ task.description }}
-          </p>
+          <!-- Description preview (default show, with markdown support) -->
+          <div 
+            v-if="task.description" 
+            class="mt-1.5 text-xs text-gray-500 dark:text-gray-400 prose prose-sm dark:prose-invert max-w-none"
+            :class="{ 'line-clamp-3': !isExpanded }"
+            v-html="markdownParser.parse(task.description)"
+          ></div>
         </div>
         <!-- 展开/收起按钮（仅有详情内容时显示） -->
         <button 
@@ -120,6 +123,7 @@ import { useColumnStore } from '@/stores/column';
 import { ChevronDown, Clock } from 'lucide-vue-next';
 import { useI18n } from 'vue-i18n';
 import SubtaskList from './SubtaskList.vue'; // Import SubtaskList
+import { markdownParser } from '@/utils/markdown';
 
 const { t, locale } = useI18n();
 
@@ -127,7 +131,7 @@ const props = defineProps<{
   task: Task
 }>();
 
-const emit = defineEmits<{
+defineEmits<{
   (e: 'context-menu', event: MouseEvent, task: Task): void
 }>();
 
@@ -209,3 +213,25 @@ function formatDate(dateStr: string): string {
   return date.toLocaleDateString(locale.value, { month: 'short', day: 'numeric' });
 }
 </script>
+
+<style scoped>
+.prose :where(ul, ol):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+  padding-left: 1.25rem;
+}
+
+.prose :where(li):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.prose :where(p):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.prose :where(p):not(:first-child) {
+  margin-top: 0.25rem;
+}
+</style>

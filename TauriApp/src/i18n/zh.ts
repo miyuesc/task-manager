@@ -12,6 +12,8 @@ export default {
     trash: "已作废",
     dashboard: "仪表盘",
     overview: "项目总览",
+    collapse: "收起",
+    expand: "展开",
   },
   view: {
     board: "看板",
@@ -61,9 +63,11 @@ export default {
     column: "看板列",
   },
   priority: {
+    negligible: "可忽略",
     low: "低",
     medium: "中",
     high: "高",
+    urgent: "紧急",
   },
   common: {
     confirm: "确认",

@@ -1,6 +1,6 @@
 <template>
-  <div class="px-6 py-4 border-b border-gray-100 dark:border-zinc-800 shrink-0">
-    <div class="top-row mb-4 flex items-center justify-between">
+  <div class="px-6 py-2 border-b border-gray-100 dark:border-zinc-800 shrink-0">
+    <div class="top-row flex items-center justify-between">
       <!-- 面包屑导航: 项目 / 列 -->
       <div class="flex items-center gap-2 text-sm">
         <button v-if="showBackButton" @click="$emit('back')" class="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors mr-1">

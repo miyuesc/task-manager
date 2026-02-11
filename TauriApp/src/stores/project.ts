@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { SYSTEM_COLORS } from "@/constants/resources";
 
 export interface Project {
   id: string;
@@ -8,17 +9,7 @@ export interface Project {
   icon?: string;
 }
 
-const COLORS = [
-  "blue",
-  "red",
-  "green",
-  "orange",
-  "purple",
-  "pink",
-  "yellow",
-  "cyan",
-  "indigo",
-];
+const COLORS = SYSTEM_COLORS.map((c) => c.id);
 
 export const useProjectStore = defineStore(
   "projects",

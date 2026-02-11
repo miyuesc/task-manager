@@ -7,7 +7,7 @@
       >
         <!-- Header -->
         <div class="px-6 py-4 border-b border-gray-100 dark:border-zinc-800 flex items-center justify-between shrink-0">
-          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('settings.title') }}</h2>
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-50">{{ t('settings.title') }}</h2>
           <button 
             @click="close"
             class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
@@ -62,7 +62,7 @@
                 <label class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ t('settings.language') }}</label>
                 <select 
                   v-model="settingsStore.locale"
-                  class="w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                  class="w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg text-sm text-gray-900 dark:text-gray-50 focus:ring-2 focus:ring-blue-500 outline-none"
                 >
                   <option value="en">English (US)</option>
                   <option value="zh">简体中文</option>
@@ -114,7 +114,7 @@
                   <input 
                     v-model="settingsStore.userName"
                     type="text"
-                    class="w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                    class="w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg text-sm text-gray-900 dark:text-gray-50 focus:ring-2 focus:ring-blue-500 outline-none"
                   />
                </div>
 
@@ -170,7 +170,7 @@
               <div class="space-y-4">
                 <div class="flex items-center justify-between p-4 border border-gray-100 dark:border-zinc-800 rounded-xl">
                   <div>
-                    <h4 class="text-sm font-medium text-gray-900 dark:text-white">{{ t('settings.export_data') }}</h4>
+                    <h4 class="text-sm font-medium text-gray-900 dark:text-gray-50">{{ t('settings.export_data') }}</h4>
                     <p class="text-xs text-gray-500 mt-1">{{ t('settings.export_desc') }}</p>
                   </div>
                   <button 
@@ -184,7 +184,7 @@
 
                 <div class="flex items-center justify-between p-4 border border-gray-100 dark:border-zinc-800 rounded-xl">
                   <div>
-                    <h4 class="text-sm font-medium text-gray-900 dark:text-white">{{ t('settings.import_data') }}</h4>
+                    <h4 class="text-sm font-medium text-gray-900 dark:text-gray-50">{{ t('settings.import_data') }}</h4>
                     <p class="text-xs text-gray-500 mt-1">{{ t('settings.import_desc') }}</p>
                   </div>
                   <label 
@@ -317,7 +317,7 @@ const projectStore = useProjectStore();
 const columnStore = useColumnStore();
 const labelStore = useLabelStore();
 const syncStore = useSyncStore();
-const { confirm } = useConfirm();
+const { confirm, alert: showAlert } = useConfirm();
 
 // Tabs
 const activeTab = ref('general');
@@ -395,7 +395,7 @@ async function importData(e: Event) {
 
     // Validate (Simple check)
     if (!data.tasks || !data.projects || !data.columns) {
-      alert(t('settings.invalid_file'));
+      await showAlert(t('settings.invalid_file'), undefined, 'error');
       return;
     }
 
@@ -424,14 +424,14 @@ async function importData(e: Event) {
        if (data.settings.zoomLevel) settingsStore.setZoom(data.settings.zoomLevel);
     }
     
-    alert(t('settings.import_success'));
+    await showAlert(t('settings.import_success'), undefined, 'success');
     close();
     // Maybe reload to ensure fresh state usage
     window.location.reload(); 
 
   } catch (err) {
     console.error(err);
-    alert(t('settings.import_error'));
+    await showAlert(t('settings.import_error'), undefined, 'error');
   } finally {
     // Reset input
     target.value = '';

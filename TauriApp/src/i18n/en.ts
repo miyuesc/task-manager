@@ -12,6 +12,8 @@ export default {
     trash: "Trash",
     dashboard: "Dashboard",
     overview: "Overview",
+    collapse: "Collapse",
+    expand: "Expand",
   },
   view: {
     board: "Board",
@@ -62,9 +64,11 @@ export default {
     column: "Column",
   },
   priority: {
+    negligible: "Negligible",
     low: "Low",
     medium: "Medium",
     high: "High",
+    urgent: "Urgent",
   },
   common: {
     confirm: "Confirm",

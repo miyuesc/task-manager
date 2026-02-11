@@ -14,6 +14,15 @@ export const useSettingsStore = defineStore(
 
     const isSettingsOpen = ref(false);
 
+    // Sidebar 持久化状态
+    const sidebarCollapsed = ref(false);
+    const sidebarViewsExpanded = ref(true);
+    const sidebarProjectsExpanded = ref(true);
+    const sidebarLabelsExpanded = ref(true);
+
+    // Markdown 实时预览持久化状态
+    const markdownPreviewEnabled = ref(true);
+
     // Helper to get system preference
     const systemIsDark = ref(
       window.matchMedia("(prefers-color-scheme: dark)").matches,
@@ -96,6 +105,11 @@ export const useSettingsStore = defineStore(
       userAvatar,
       isDark,
       isSettingsOpen,
+      sidebarCollapsed,
+      sidebarViewsExpanded,
+      sidebarProjectsExpanded,
+      sidebarLabelsExpanded,
+      markdownPreviewEnabled,
       setTheme,
       setLocale,
       setZoom,

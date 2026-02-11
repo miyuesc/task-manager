@@ -21,6 +21,20 @@ export function configureMarked() {
     return `<pre><code class="hljs language-${validLang}">${highlighted}</code></pre>`;
   };
 
+  // 自定义链接渲染
+  renderer.link = function ({
+    href,
+    title,
+    text,
+  }: {
+    href: string;
+    title?: string | null;
+    text: string;
+  }) {
+    const titleAttr = title ? ` title="${title}"` : "";
+    return `<a href="${href}"${titleAttr} target="_blank" rel="noopener noreferrer">${text}</a>`;
+  };
+
   marked.use({ renderer });
 
   return marked;

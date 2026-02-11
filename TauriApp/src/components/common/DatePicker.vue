@@ -5,7 +5,7 @@
       class="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors"
     >
       <CalendarDays class="w-4 h-4 text-gray-400" />
-      <span :class="modelValue ? 'text-gray-900 dark:text-white' : 'text-gray-400'">
+      <span :class="modelValue ? 'text-gray-900 dark:text-gray-50' : 'text-gray-400'">
         {{ displayValue }}
       </span>
     </button>
@@ -27,7 +27,7 @@
             <button @click="prevMonth" class="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
               <ChevronLeft class="w-5 h-5" />
             </button>
-            <span class="text-base font-semibold text-gray-900 dark:text-white">
+            <span class="text-base font-semibold text-gray-900 dark:text-gray-50">
               {{ monthHeading }}
             </span>
             <button @click="nextMonth" class="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
@@ -230,7 +230,7 @@ function getDayClass(day: number): string {
     return 'bg-blue-500 text-white hover:bg-blue-600';
   }
   if (isToday(day)) {
-    return 'text-gray-900 dark:text-white font-semibold hover:bg-gray-100 dark:hover:bg-zinc-800';
+    return 'text-gray-900 dark:text-gray-50 font-semibold hover:bg-gray-100 dark:hover:bg-zinc-800';
   }
   return 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-800';
 }

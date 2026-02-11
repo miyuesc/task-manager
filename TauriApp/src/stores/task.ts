@@ -9,7 +9,7 @@ export interface Task {
   columnId: string;
   title: string;
   description?: string;
-  priority?: "low" | "medium" | "high";
+  priority?: "negligible" | "low" | "medium" | "high" | "urgent";
   dueDate?: string;
   startDate?: string;
   labels: string[];

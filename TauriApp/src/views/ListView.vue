@@ -4,7 +4,7 @@
       <!-- Header -->
       <div class="px-6 py-4 border-b border-gray-100 dark:border-zinc-800 flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <h2 class="text-sm font-semibold text-gray-900 dark:text-white">{{ viewTitle }}</h2>
+          <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-50">{{ viewTitle }}</h2>
           <span class="text-xs text-gray-400">{{ filteredTasks.length }} {{ t('common.tasks') }}</span>
         </div>
         <!-- Progressing 视图配置按钮 -->
@@ -24,10 +24,10 @@
           <tr>
             <th class="w-8 pl-4 py-3"></th>
             <th class="px-2 py-3">{{ t('task.title') }}</th> <!-- Using 'description' as Title/Task Name equivalent or add new key -->
-            <th class="w-28 px-2 py-3 hidden md:table-cell">{{ t('task.status') }}</th>
-            <th class="w-24 px-2 py-3 hidden sm:table-cell">{{ t('task.priority') }}</th>
-            <th class="w-28 px-2 py-3 hidden sm:table-cell">{{ t('task.due_date') }}</th>
-            <th class="w-28 px-2 py-3 hidden lg:table-cell">{{ t('task.project') }}</th>
+            <th class="w-40 px-2 py-3 hidden md:table-cell">{{ t('task.status') }}</th>
+            <th class="w-32 px-2 py-3 hidden sm:table-cell">{{ t('task.priority') }}</th>
+            <th class="w-32 px-2 py-3 hidden sm:table-cell">{{ t('task.due_date') }}</th>
+            <th class="w-64 px-2 py-3 hidden lg:table-cell">{{ t('task.project') }}</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-zinc-800">
@@ -71,7 +71,7 @@
                   :class="{ 
                     'line-through text-gray-400 dark:text-gray-500': smartViewId === 'trash',
                     'text-gray-500 grayscale': node.task.completed && smartViewId !== 'trash',
-                    'text-gray-900 dark:text-white': !node.task.completed && smartViewId !== 'trash',
+                    'text-gray-900 dark:text-gray-50': !node.task.completed && smartViewId !== 'trash',
                     'text-sm': node.level > 0
                   }"
                   :title="node.task.title"
@@ -152,7 +152,7 @@
         class="bg-white dark:bg-zinc-900 rounded-xl shadow-xl w-full max-w-md p-6 border border-gray-200 dark:border-zinc-800"
         @click.stop
       >
-        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-50 mb-4">
           {{ smartViewId === 'progressing' ? t('sidebar.progressing') : t('sidebar.completed') }} {{ t('common.preferences') }}
         </h3>
         
@@ -216,6 +216,7 @@ import { useLabelStore } from '@/stores/label';
 import { useTaskModal } from '@/composables/useTaskModal';
 import { ListTodo, Settings, ChevronRight, ChevronDown } from 'lucide-vue-next';
 import { useI18n } from 'vue-i18n';
+import { TaskPriority, PRIORITY_CONFIG, COLOR_BG_MAP } from '@/constants/resources';
 
 const { t, locale } = useI18n();
 const route = useRoute();
@@ -359,14 +360,8 @@ function getProjectName(projectId: string) {
 
 function getProjectColor(projectId: string) {
   const project = projectStore.getProject(projectId);
-  const colorMap: Record<string, string> = {
-    'blue': 'bg-blue-500',
-    'red': 'bg-red-500',
-    'green': 'bg-emerald-500',
-    'orange': 'bg-orange-500',
-    'purple': 'bg-purple-500',
-  };
-  return colorMap[project?.color || ''] || 'bg-gray-400';
+  if (!project) return 'bg-gray-400';
+  return COLOR_BG_MAP[project.color] || 'bg-gray-400';
 }
 
 function getSubtaskCount(taskId: string) {
@@ -378,12 +373,8 @@ function getCompletedSubtaskCount(taskId: string) {
 }
 
 function priorityClass(priority: string) {
-  switch (priority) {
-    case 'high': return 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400';
-    case 'medium': return 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400';
-    case 'low': return 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400';
-    default: return 'bg-gray-100 text-gray-600';
-  }
+  const config = PRIORITY_CONFIG[priority as TaskPriority];
+  return config ? config.bgClass : 'bg-gray-100 text-gray-600';
 }
 
 import { getRelativeDate } from '@/utils/date';

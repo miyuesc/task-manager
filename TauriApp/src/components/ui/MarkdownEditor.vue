@@ -45,6 +45,7 @@ import { useI18n } from 'vue-i18n';
 import MarkdownToolbar from './markdown/MarkdownToolbar.vue';
 import { useMarkdownEditor } from '@/composables/useMarkdownEditor';
 import { markdownParser } from '@/utils/markdown';
+import { useSettingsStore } from '@/stores/settings';
 
 // 定义组件属性
 interface Props {
@@ -63,7 +64,11 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
-const showPreview = ref(true); // 控制预览区域的显示/隐藏
+const settingsStore = useSettingsStore();
+const showPreview = computed({
+  get: () => settingsStore.markdownPreviewEnabled,
+  set: (v) => settingsStore.markdownPreviewEnabled = v,
+}); // 控制预览区域的显示/隐藏（持久化）
 const textareaRef = ref<HTMLTextAreaElement | null>(null); // 获取 textarea DOM 引用
 
 // 引入 Markdown 编辑核心逻辑 (Composable)

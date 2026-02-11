@@ -11,7 +11,7 @@
           >
             <!-- Header -->
             <div class="px-6 py-4 border-b border-gray-100 dark:border-zinc-700 flex items-center justify-between">
-              <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+              <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-50 flex items-center gap-2">
                 <component :is="iconComponent" class="w-5 h-5 flex-shrink-0" :class="iconColorClass" />
                 {{ store.options.title || '提示' }}
               </h3>

@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n';
 import Sortable from 'sortablejs';
 import { 
   CheckSquare, Calendar, Clock, 
-  Settings, Plus, Tag, ChevronLeft, ChevronRight,
+  Settings, Plus, Tag, ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
   Pencil, Palette, Trash2,
   Inbox, CheckCircle, LayoutGrid
 } from 'lucide-vue-next';
@@ -14,6 +14,7 @@ import { useProjectStore } from '@/stores/project';
 import { useLabelStore } from '@/stores/label';
 import { useSettingsStore } from '@/stores/settings';
 import { useConfirm } from '@/composables/useConfirm';
+import Tooltip from '@/components/ui/Tooltip.vue';
 
 const { t } = useI18n();
 const router = useRouter();
@@ -25,9 +26,26 @@ const labelStore = useLabelStore();
 const settingsStore = useSettingsStore();
 const { confirm, alert } = useConfirm();
 
-const isCollapsed = ref(false);
+const isCollapsed = computed({
+  get: () => settingsStore.sidebarCollapsed,
+  set: (v) => settingsStore.sidebarCollapsed = v,
+});
 const projectsListRef = ref<HTMLElement | null>(null);
 const labelsListRef = ref<HTMLElement | null>(null);
+
+// 收起/展开状态（持久化到 settingsStore）
+const isViewsExpanded = computed({
+  get: () => settingsStore.sidebarViewsExpanded,
+  set: (v) => settingsStore.sidebarViewsExpanded = v,
+});
+const isProjectsExpanded = computed({
+  get: () => settingsStore.sidebarProjectsExpanded,
+  set: (v) => settingsStore.sidebarProjectsExpanded = v,
+});
+const isLabelsExpanded = computed({
+  get: () => settingsStore.sidebarLabelsExpanded,
+  set: (v) => settingsStore.sidebarLabelsExpanded = v,
+});
 
 // Navigation
 const navItems = [
@@ -37,6 +55,24 @@ const navItems = [
   { name: 'completed', path: '/smart/completed', icon: CheckCircle, iconColor: 'text-gray-500' },
   { name: 'trash', path: '/smart/trash', icon: Trash2, iconColor: 'text-red-500' },
 ];
+
+// 收起时只显示前 3 个视图
+const visibleNavItems = computed(() => {
+  if (isViewsExpanded.value) return navItems;
+  return navItems.slice(0, 3);
+});
+
+// 项目列表：超过 3 个时支持收起/展开
+const visibleProjects = computed(() => {
+  if (isProjectsExpanded.value || projectStore.projects.length <= 3) return projectStore.projects;
+  return projectStore.projects.slice(0, 3);
+});
+
+// 标签列表：超过 3 个时支持收起/展开
+const visibleLabels = computed(() => {
+  if (isLabelsExpanded.value || labelStore.labels.length <= 3) return labelStore.labels;
+  return labelStore.labels.slice(0, 3);
+});
 
 function isActive(path: string) {
   return route.path === path;
@@ -207,19 +243,12 @@ async function handleContextAction(action: string) {
     contextMenu.value = null;
 }
 
+import { SYSTEM_COLORS } from '@/constants/resources';
+
 // Color Picker
 const showColorPicker = ref(false);
 const colorPickerTarget = ref<{type: 'project'|'label', id: string} | null>(null);
-const colors = [
-    { name: 'red', bg: 'bg-red-500' },
-    { name: 'orange', bg: 'bg-orange-500' },
-    { name: 'yellow', bg: 'bg-amber-500' },
-    { name: 'green', bg: 'bg-green-500' },
-    { name: 'blue', bg: 'bg-blue-500' },
-    { name: 'purple', bg: 'bg-purple-500' },
-    { name: 'pink', bg: 'bg-pink-500' },
-    { name: 'gray', bg: 'bg-gray-500' },
-];
+const colors = SYSTEM_COLORS.map(c => ({ name: c.id, bg: c.bgClass }));
 
 function selectColor(color: string) {
     if (!colorPickerTarget.value) return;
@@ -235,8 +264,13 @@ function selectColor(color: string) {
 
 function getColorClass(color: string, type: 'bg' | 'text') {
     const prefix = type === 'bg' ? 'bg' : 'text';
-    const shade = '500';
-    return `${prefix}-${color}-${shade}`;
+    // 优先从 SYSTEM_COLORS 匹配对应的类名，如果没有则使用默认逻辑
+    const sysColor = SYSTEM_COLORS.find(c => c.id === color);
+    if (sysColor) {
+        if (type === 'bg') return sysColor.bgClass;
+        return `text-${color}-500`; // text 类名暂时维持现状
+    }
+    return `${prefix}-${color}-500`;
 }
 
 function toggleCollapse() {
@@ -308,37 +342,47 @@ onUnmounted(() => {
         <div class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center shrink-0">
           <CheckSquare class="w-4 h-4 text-white" />
         </div>
-        <span v-if="!isCollapsed" class="text-base font-semibold text-gray-900 dark:text-white whitespace-nowrap">TaskFlow</span>
+        <span v-if="!isCollapsed" class="text-base font-semibold text-gray-900 dark:text-gray-50 whitespace-nowrap">TaskFlow</span>
       </div>
     </div>
 
     <!-- Main Navigation -->
-    <nav class="flex-1 overflow-y-auto overflow-x-hidden py-3 px-2 space-y-6">
+    <nav class="flex-1 overflow-y-auto overflow-x-hidden py-3 px-2 space-y-2">
       <!-- Standard Views -->
       <div class="space-y-0.5">
-        <template v-for="item in navItems" :key="item.name">
-          <router-link 
-            :to="item.path" 
-            class="flex items-center rounded-lg transition-all duration-300"
-            :class="[
-              isActive(item.path) 
-                ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' 
-                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800/50',
-              isCollapsed ? 'justify-center w-10 h-10 mx-auto gap-0' : 'justify-start w-full px-3 h-10 gap-3'
-            ]"
-            :title="isCollapsed ? t('sidebar.' + item.name) : undefined"
-          >
-            <component :is="item.icon" class="w-5 h-5 shrink-0 transition-all duration-300" :class="isActive(item.path) ? 'text-blue-600 dark:text-blue-400' : item.iconColor" />
-            
-            <span 
-              class="flex items-center overflow-hidden transition-all duration-300 origin-left"
-              :class="isCollapsed ? 'w-0 opacity-0' : 'w-full opacity-100'"
+        <template v-for="item in visibleNavItems" :key="item.name">
+          <Tooltip :text="isCollapsed ? t('sidebar.' + item.name) : undefined" position="right" :inline="false">
+            <router-link 
+              :to="item.path" 
+              class="flex items-center rounded-lg transition-all duration-300"
+              :class="[
+                isActive(item.path) 
+                  ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' 
+                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800/50',
+                isCollapsed ? 'justify-center w-10 h-10 mx-auto gap-0' : 'justify-start w-full px-3 h-10 gap-3'
+              ]"
             >
-              <span class="truncate flex-1">{{ t('sidebar.' + item.name) }}</span>
-              <span v-if="getNavCount(item.name) > 0" class="ml-auto text-xs text-gray-400 shrink-0">{{ getNavCount(item.name) }}</span>
-            </span>
-          </router-link>
+              <component :is="item.icon" class="w-5 h-5 shrink-0 transition-all duration-300" :class="isActive(item.path) ? 'text-blue-600 dark:text-blue-400' : item.iconColor" />
+              
+              <span 
+                class="flex items-center overflow-hidden transition-all duration-300 origin-left"
+                :class="isCollapsed ? 'w-0 opacity-0' : 'w-full opacity-100'"
+              >
+                <span class="truncate flex-1">{{ t('sidebar.' + item.name) }}</span>
+                <span v-if="getNavCount(item.name) > 0" class="ml-auto text-xs text-gray-400 shrink-0">{{ getNavCount(item.name) }}</span>
+              </span>
+            </router-link>
+          </Tooltip>
         </template>
+      </div>
+
+      <!-- 视图收起/展开分割线 （5个视图，超过3个时显示） -->
+      <div v-if="navItems.length > 3" class="sidebar-divider flex items-center px-1 cursor-pointer select-none">
+        <div class="flex-1 h-px bg-gray-200 dark:bg-zinc-700"></div>
+        <template v-if="!isCollapsed">
+          <component :is="isViewsExpanded ? ChevronUp : ChevronDown" class="w-5 h-5 mx-1 text-gray-400 shrink-0" @click="isViewsExpanded = !isViewsExpanded" />
+        </template>
+        <div class="flex-1 h-px bg-gray-200 dark:bg-zinc-700"></div>
       </div>
 
       <!-- Projects -->
@@ -357,28 +401,29 @@ onUnmounted(() => {
         </div>
         
         <!-- Overview Project View -->
-        <router-link 
-            to="/overview" 
-            class="flex items-center rounded-lg transition-all duration-300 mb-0.5"
-            :class="[
-                  isActive('/overview') 
-                    ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' 
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800/50',
-                  isCollapsed ? 'justify-center w-10 h-9 mx-auto gap-0' : 'justify-start w-full px-3 h-9 gap-3'
-            ]"
-            :title="isCollapsed ? t('sidebar.overview') : undefined"
-        >
-            <LayoutGrid class="w-4 h-4 shrink-0" :class="isActive('/overview') ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400'" />
-            <span 
-               class="truncate transition-all duration-300 origin-left"
-               :class="isCollapsed ? 'w-0 opacity-0' : 'w-full opacity-100'"
-            >
-               {{ t('sidebar.overview') }}
-            </span>
-        </router-link>
+        <Tooltip :text="isCollapsed ? t('sidebar.overview') : undefined" position="right">
+          <router-link 
+              to="/overview" 
+              class="flex items-center rounded-lg transition-all duration-300 mb-0.5"
+              :class="[
+                    isActive('/overview') 
+                      ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' 
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800/50',
+                    isCollapsed ? 'justify-center w-10 h-9 mx-auto gap-0' : 'justify-start w-full px-3 h-9 gap-3'
+              ]"
+          >
+              <LayoutGrid class="w-4 h-4 shrink-0" :class="isActive('/overview') ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400'" />
+              <span 
+                 class="truncate transition-all duration-300 origin-left"
+                 :class="isCollapsed ? 'w-0 opacity-0' : 'w-full opacity-100'"
+              >
+                 {{ t('sidebar.overview') }}
+              </span>
+          </router-link>
+        </Tooltip>
 
         <div class="space-y-0.5" ref="projectsListRef">
-          <template v-for="project in projectStore.projects" :key="project.id">
+          <template v-for="project in visibleProjects" :key="project.id">
             <!-- Project Item Wrapper -->
             <div :data-id="project.id">
               <!-- Edit View -->
@@ -393,40 +438,41 @@ onUnmounted(() => {
                   @keydown.enter="saveProjectName"
                   @keydown.escape="editingProjectId = null"
                   @blur="saveProjectName"
-                  class="flex-1 min-w-0 text-sm bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded px-2 h-7 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  class="flex-1 min-w-0 text-sm bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded px-2 h-7 text-gray-900 dark:text-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <!-- Standard View -->
-              <router-link 
-                v-else
-                :to="`/project/${project.id}/${activeProjectView}`"
-                @dblclick="!isCollapsed && startEditProject(project)"
-                @contextmenu="showContextMenu($event, 'project', project.id)"
-                class="flex items-center rounded-lg transition-all duration-300 group"
-                :class="[
-                  isProjectActive(project.id) 
-                    ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' 
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800/50',
-                  isCollapsed ? 'justify-center w-10 h-9 mx-auto gap-0' : 'justify-start w-full px-3 h-9 gap-3'
-                ]"
-                :title="isCollapsed ? project.name : undefined"
-              >
-                <span 
-                  class="rounded-full shrink-0 transition-all duration-300"
+              <Tooltip :text="isCollapsed ? project.name : undefined" position="right">
+                <router-link 
+                  v-if="editingProjectId !== project.id || isCollapsed"
+                  :to="`/project/${project.id}/${activeProjectView}`"
+                  @dblclick="!isCollapsed && startEditProject(project)"
+                  @contextmenu="showContextMenu($event, 'project', project.id)"
+                  class="flex items-center rounded-lg transition-all duration-300 group"
                   :class="[
-                    getColorClass(project.color, 'bg'),
-                    isCollapsed ? 'w-3 h-3' : 'w-2.5 h-2.5 group-hover:scale-110'
+                    isProjectActive(project.id) 
+                      ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' 
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800/50',
+                    isCollapsed ? 'justify-center w-10 h-9 mx-auto gap-0' : 'justify-start w-full px-3 h-9 gap-3'
                   ]"
-                ></span>
-                
-                <span 
-                  class="truncate transition-all duration-300 origin-left"
-                  :class="isCollapsed ? 'w-0 opacity-0' : 'w-full opacity-100'"
                 >
-                  {{ project.name }}
-                </span>
-              </router-link>
+                  <span 
+                    class="rounded-full shrink-0 transition-all duration-300"
+                    :class="[
+                      getColorClass(project.color, 'bg'),
+                      isCollapsed ? 'w-3 h-3' : 'w-2.5 h-2.5 group-hover:scale-110'
+                    ]"
+                  ></span>
+                  
+                  <span 
+                    class="truncate transition-all duration-300 origin-left"
+                    :class="isCollapsed ? 'w-0 opacity-0' : 'w-full opacity-100'"
+                  >
+                    {{ project.name }}
+                  </span>
+                </router-link>
+              </Tooltip>
             </div>
           </template>
 
@@ -439,9 +485,21 @@ onUnmounted(() => {
               @keydown.enter="confirmAddProject"
               @keydown.escape="cancelAddProject"
               @blur="confirmAddProject"
-              class="flex-1 min-w-0 text-sm bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded px-2 h-7 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="flex-1 min-w-0 text-sm bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded px-2 h-7 text-gray-900 dark:text-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
+        </div>
+
+        <!-- 项目收起/展开分割线 -->
+        <div 
+          v-if="projectStore.projects.length > 3" 
+          class="sidebar-divider flex items-center px-1 mt-1 cursor-pointer select-none" 
+        >
+          <div class="flex-1 h-px bg-gray-200 dark:bg-zinc-700"></div>
+          <template v-if="!isCollapsed">
+            <component :is="isProjectsExpanded ? ChevronUp : ChevronDown" class="w-5 h-5 mx-1 text-gray-400 shrink-0" @click="isProjectsExpanded = !isProjectsExpanded" />
+          </template>
+          <div class="flex-1 h-px bg-gray-200 dark:bg-zinc-700"></div>
         </div>
       </div>
 
@@ -461,7 +519,7 @@ onUnmounted(() => {
         </div>
 
         <div class="space-y-0.5" ref="labelsListRef">
-          <template v-for="label in labelStore.labels" :key="label.id">
+          <template v-for="label in visibleLabels" :key="label.id">
             <div :data-id="label.id">
               <!-- Edit View -->
               <div 
@@ -475,40 +533,41 @@ onUnmounted(() => {
                   @keydown.enter="saveLabelName"
                   @keydown.escape="editingLabelId = null"
                   @blur="saveLabelName"
-                  class="flex-1 min-w-0 text-sm bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded px-2 h-7 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  class="flex-1 min-w-0 text-sm bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded px-2 h-7 text-gray-900 dark:text-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <!-- Standard View -->
-              <router-link 
-                v-else
-                :to="`/label/${label.id}`"
-                @dblclick="!isCollapsed && startEditLabel(label)"
-                @contextmenu="showContextMenu($event, 'label', label.id)"
-                class="flex items-center rounded-lg transition-all duration-300 group"
-                :class="[
-                  isLabelActive(label.id) 
-                    ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' 
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800/50',
-                  isCollapsed ? 'justify-center w-10 h-9 mx-auto gap-0' : 'justify-start w-full px-3 h-9 gap-3'
-                ]"
-                :title="isCollapsed ? label.name : undefined"
-              >
-                <Tag 
-                  class="shrink-0 transition-all duration-300" 
+              <Tooltip :text="isCollapsed ? label.name : undefined" position="right">
+                <router-link 
+                  v-if="editingLabelId !== label.id || isCollapsed"
+                  :to="`/label/${label.id}`"
+                  @dblclick="!isCollapsed && startEditLabel(label)"
+                  @contextmenu="showContextMenu($event, 'label', label.id)"
+                  class="flex items-center rounded-lg transition-all duration-300 group"
                   :class="[
-                    getColorClass(label.color, 'text'),
-                    isCollapsed ? 'w-4 h-4' : 'w-4 h-4 group-hover:scale-110'
-                  ]" 
-                />
-                
-                <span 
-                  class="truncate transition-all duration-300 origin-left"
-                  :class="isCollapsed ? 'w-0 opacity-0' : 'w-full opacity-100'"
+                    isLabelActive(label.id) 
+                      ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' 
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800/50',
+                    isCollapsed ? 'justify-center w-10 h-9 mx-auto gap-0' : 'justify-start w-full px-3 h-9 gap-3'
+                  ]"
                 >
-                  {{ label.name }}
-                </span>
-              </router-link>
+                  <Tag 
+                    class="shrink-0 transition-all duration-300" 
+                    :class="[
+                      getColorClass(label.color, 'text'),
+                      isCollapsed ? 'w-4 h-4' : 'w-4 h-4 group-hover:scale-110'
+                    ]" 
+                  />
+                  
+                  <span 
+                    class="truncate transition-all duration-300 origin-left"
+                    :class="isCollapsed ? 'w-0 opacity-0' : 'w-full opacity-100'"
+                  >
+                    {{ label.name }}
+                  </span>
+                </router-link>
+              </Tooltip>
             </div>
           </template>
 
@@ -521,9 +580,21 @@ onUnmounted(() => {
               @keydown.enter="confirmAddLabel"
               @keydown.escape="cancelAddLabel"
               @blur="confirmAddLabel"
-              class="flex-1 min-w-0 text-sm bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded px-2 h-7 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="flex-1 min-w-0 text-sm bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded px-2 h-7 text-gray-900 dark:text-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
+        </div>
+
+        <!-- 标签收起/展开分割线 -->
+        <div 
+          v-if="labelStore.labels.length > 3" 
+          class="sidebar-divider flex items-center px-1 mt-1 cursor-pointer select-none" 
+        >
+          <div class="flex-1 h-px bg-gray-200 dark:bg-zinc-700"></div>
+          <template v-if="!isCollapsed">
+            <component :is="isLabelsExpanded ? ChevronUp : ChevronDown" class="w-5 h-5 mx-1 text-gray-400 shrink-0" @click="isLabelsExpanded = !isLabelsExpanded" />
+          </template>
+          <div class="flex-1 h-px bg-gray-200 dark:bg-zinc-700"></div>
         </div>
       </div>
     </nav>

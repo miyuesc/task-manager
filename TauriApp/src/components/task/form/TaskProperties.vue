@@ -5,7 +5,7 @@
       <span class="text-sm text-gray-500 w-24">{{ t('task.start_date') }}</span>
       <DatePicker 
         :model-value="task.startDate" 
-        @update:model-value="(val) => $emit('update', 'startDate', val)"
+        @update:model-value="handleStartDateChange"
         :placeholder="t('task.set_start_date')" 
       />
     </div>
@@ -15,7 +15,7 @@
       <span class="text-sm text-gray-500 w-24">{{ t('task.due_date') }}</span>
       <DatePicker 
         :model-value="task.dueDate" 
-        @update:model-value="(val) => $emit('update', 'dueDate', val)"
+        @update:model-value="handleDueDateChange"
         :placeholder="t('task.set_due_date')" 
       />
     </div>
@@ -109,6 +109,7 @@ import { BarChart3, ChevronDown, Plus, X, MapPin } from 'lucide-vue-next';
 import DatePicker from '@/components/common/DatePicker.vue';
 import Dropdown from '@/components/ui/Dropdown.vue';
 import { useLabelStore } from '@/stores/label';
+import { TaskPriority, PRIORITY_CONFIG, COLOR_MAP } from '@/constants/resources';
 
 const props = defineProps<{
   task: any;
@@ -120,11 +121,11 @@ const { t } = useI18n();
 const labelStore = useLabelStore();
 
 // Priority Options
-const priorityOptions = computed(() => [
-  { value: 'low', label: t('priority.low'), color: '#10B981' },
-  { value: 'medium', label: t('priority.medium'), color: '#3B82F6' },
-  { value: 'high', label: t('priority.high'), color: '#EF4444' },
-]);
+const priorityOptions = computed(() => Object.values(TaskPriority).map(p => ({
+  value: p, 
+  label: t(PRIORITY_CONFIG[p].labelKey), 
+  color: PRIORITY_CONFIG[p].hex 
+})));
 
 // Label Options
 const labelOptions = computed(() => labelStore.labels.map(l => ({
@@ -132,13 +133,15 @@ const labelOptions = computed(() => labelStore.labels.map(l => ({
 })));
 
 // Helper Functions
-function getPriorityLabel(p?: string) { return p ? t(`priority.${p}`) : p; }
+function getPriorityLabel(p?: string) { 
+  if (!p) return p;
+  const config = PRIORITY_CONFIG[p as TaskPriority];
+  return config ? t(config.labelKey) : p; 
+}
 
 function getPriorityClass(p?: string) {
-    if (p === 'low') return 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30';
-    if (p === 'medium') return 'bg-blue-100 text-blue-600 dark:bg-blue-900/30';
-    if (p === 'high') return 'bg-red-100 text-red-600 dark:bg-red-900/30';
-    return '';
+    const config = PRIORITY_CONFIG[p as TaskPriority];
+    return config ? config.bgClass : '';
 }
 
 function getLabelName(id: string) { return labelStore.labels.find(l => l.id === id)?.name || id; }
@@ -146,8 +149,7 @@ function getLabelName(id: string) { return labelStore.labels.find(l => l.id === 
 function getLabelColor(id: string) { return getColorHex(labelStore.labels.find(l => l.id === id)?.color || 'gray'); }
 
 function getColorHex(color: string): string {
-    const map: Record<string, string> = { red: '#EF4444', blue: '#3B82F6', green: '#10B981', orange: '#F97316', purple: '#A855F7', gray: '#6B7280' };
-    return map[color] || color;
+    return COLOR_MAP[color] || color;
 }
 
 // Actions
@@ -161,6 +163,23 @@ function removeLabel(id: string) {
   const currentLabels = props.task.labels || [];
   const newLabels = currentLabels.filter((l: string) => l !== id);
   emit('update', 'labels', newLabels);
+}
+
+// 日期联动校验
+function handleStartDateChange(val: string) {
+  emit('update', 'startDate', val);
+  // 如果存在截止日期且新开始日期晚于截止日期，同步截止日期
+  if (val && props.task.dueDate && val > props.task.dueDate) {
+    emit('update', 'dueDate', val);
+  }
+}
+
+function handleDueDateChange(val: string) {
+  emit('update', 'dueDate', val);
+  // 如果存在开始日期且新截止日期早于开始日期，同步开始日期
+  if (val && props.task.startDate && val < props.task.startDate) {
+    emit('update', 'startDate', val);
+  }
 }
 
 function getCurrentLocation() {

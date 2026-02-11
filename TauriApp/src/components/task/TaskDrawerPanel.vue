@@ -29,7 +29,7 @@
         <input 
           v-model="titleModel"
           ref="titleInputRef"
-          class="w-full text-xl font-semibold bg-transparent border-none focus:ring-0 p-0 text-gray-900 dark:text-white placeholder-gray-400"
+          class="w-full text-xl font-semibold bg-transparent border-none focus:ring-0 p-0 text-gray-900 dark:text-gray-50 placeholder-gray-400"
           :placeholder="t('task.title_placeholder')"
         />
 
@@ -43,7 +43,7 @@
         <div class="pt-2">
           <div class="flex items-center gap-2 mb-3">
             <FileText class="w-4 h-4 text-gray-500" />
-            <h3 class="text-sm font-medium text-gray-900 dark:text-white">{{ t('task.description') }}</h3>
+            <h3 class="text-sm font-medium text-gray-900 dark:text-gray-50">{{ t('task.description') }}</h3>
           </div>
           
           <div class="bg-gray-50 dark:bg-zinc-800/50 rounded-xl border border-gray-200 dark:border-zinc-700 overflow-hidden">
@@ -55,8 +55,9 @@
           </div>
         </div>
 
-        <!-- 子任务列表 -->
+        <!-- 子任务列表：新建模式下若无标题/项目/列则隐藏 -->
         <TaskSubtasks 
+          v-if="!isCreateMode || (currentTask?.title && currentTask?.projectId && currentTask?.columnId)"
           :subtasks="subtasks"
           @add="handleAddSubtask"
           @delete="handleDeleteSubtask"

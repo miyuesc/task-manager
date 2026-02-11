@@ -65,10 +65,10 @@
         </span>
       </div>
 
-      <!-- Subtasks Section (always show progress if has subtasks) -->
-      <div v-if="subtasks.length > 0" class="mt-3">
-        <!-- Subtask Header: Toggle + Progress Ring -->
-        <div class="flex items-center gap-2" @click.stop="toggleSubtaskExpand">
+      <!-- Subtasks Section -->
+      <div v-if="subtasks.length > 0 || isSubtaskExpanded" class="mt-3">
+        <!-- Subtask Header: Toggle + Progress Ring (仅在有子任务时显示) -->
+        <div v-if="subtasks.length > 0" class="flex items-center gap-2" @click.stop="toggleSubtaskExpand">
           <!-- 圆环进度指示器 -->
           <div class="relative w-5 h-5 cursor-pointer">
             <svg class="w-5 h-5 -rotate-90" viewBox="0 0 20 20">
@@ -101,8 +101,13 @@
           />
         </div>
 
-        <!-- Subtasks List -->
-        <SubtaskList v-if="isSubtaskExpanded" class="mt-2 pl-1" :parent-id="task.id" />
+        <!-- Subtasks List - 展开时始终显示容器以接收拖拽 -->
+        <SubtaskList 
+          v-if="isSubtaskExpanded" 
+          class="mt-2 pl-1" 
+          :parent-id="task.id" 
+          @context-menu="(e, t) => $emit('context-menu', e, t)"
+        />
       </div>
     </div>
   </div>
@@ -121,6 +126,11 @@ const { t, locale } = useI18n();
 const props = defineProps<{
   task: Task
 }>();
+
+const emit = defineEmits<{
+  (e: 'context-menu', event: MouseEvent, task: Task): void
+}>();
+
 
 const taskStore = useTaskStore();
 const columnStore = useColumnStore();

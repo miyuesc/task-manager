@@ -11,6 +11,7 @@ export default {
     completed: "已完成",
     trash: "已作废",
     dashboard: "仪表盘",
+    overview: "项目总览",
   },
   view: {
     board: "看板",

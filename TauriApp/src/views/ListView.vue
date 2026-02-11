@@ -37,7 +37,7 @@
             class="hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors cursor-pointer group"
             @click="openTask(node.task.id)"
           >
-            <td class="w-8 flex items-center justify-center py-2 pl-4">
+            <td class="w-8 flex items-center justify-center py-4 pl-4">
               <input 
                 type="checkbox" 
                 :checked="node.task.completed" 
@@ -51,7 +51,7 @@
             <td class="px-2 py-2">
               <div class="flex items-center gap-2">
                 <!-- Indentation Spacer -->
-                <div :style="{ width: `${node.level * 24}px` }" class="shrink-0 transition-[width]"></div>
+                <div :style="{ width: `${node.level * 16}px` }" class="shrink-0 transition-[width]"></div>
                 
                 <!-- Expand/Collapse Button (Only for tasks with children) -->
                 <button 

@@ -50,7 +50,8 @@
             v-for="task in getColumnTasks(column.id)" 
             :key="task.id"
             :data-task-id="task.id"
-            class="task-card"
+            :data-task-card="true"
+            class="task-card-wrapper"
           >
             <TaskCard 
               :task="task" 
@@ -226,6 +227,9 @@ function getColumnTaskCount(columnId: string) {
  * 分为两部分：
  * 1. 列排序 (Column Reordering)
  * 2. 任务排序 (Task Reordering) - 支持跨列拖拽
+ * 
+ * 核心策略：在 onEnd 中先恢复 DOM 到拖拽前的状态，再通过 Vue store 更新驱动渲染
+ * 避免 SortableJS 的 DOM 操作与 Vue 的虚拟 DOM diff 冲突
  */
 function initSortables() {
   // 1. 初始化列排序
@@ -233,64 +237,275 @@ function initSortables() {
     columnSortable = Sortable.create(columnsRef.value, {
       animation: 250,
       easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
-      handle: '.column-drag-handle', // 只有拖拽此句柄才能移动列
+      handle: '.column-drag-handle',
       draggable: '.kanban-column',
-      ghostClass: 'column-ghost', // 拖拽时占位符样式
-      chosenClass: 'column-chosen', // 选中项样式
-      dragClass: 'column-drag', // 拖拽中样式
-      forceFallback: true, // 强制使用 HTML5 DnD fallback，修复 macOS WebKit 兼容性
-      fallbackOnBody: true, // 确保拖拽时元素层级脱离容器，防止被遮挡
+      ghostClass: 'column-ghost',
+      chosenClass: 'column-chosen',
+      dragClass: 'column-drag',
+      forceFallback: true,
+      fallbackOnBody: true,
+      onStart: () => { isDragging = true; },
       onEnd: (evt) => {
-        // 拖拽结束：计算新顺序并更新 Store
         if (evt.oldIndex !== undefined && evt.newIndex !== undefined && evt.oldIndex !== evt.newIndex) {
+          // 先恢复 DOM：将 SortableJS 移动的元素放回原位，让 Vue 来控制渲染
+          const { from, item, oldIndex } = evt;
+          from.removeChild(item);
+          if (oldIndex < from.children.length) {
+            from.insertBefore(item, from.children[oldIndex]);
+          } else {
+            from.appendChild(item);
+          }
+          
           const columnIds = sortedColumns.value.map(c => c.id);
-          const [moved] = columnIds.splice(evt.oldIndex, 1);
+          const [moved] = columnIds.splice(oldIndex, 1);
           columnIds.splice(evt.newIndex, 0, moved);
           columnStore.reorderColumns(columnIds);
         }
+        isDragging = false;
       },
     });
   }
 
   // 2. 初始化任务卡片排序（针对每一列）
+  initTaskSortables();
+}
+
+/**
+ * 仅初始化任务拖拽实例（不影响列排序实例）
+ */
+function initTaskSortables() {
   nextTick(() => {
+    // 1. 初始化看板列的任务容器
     const containers = document.querySelectorAll('.task-container');
     containers.forEach((container) => {
       const columnId = (container as HTMLElement).dataset.columnId;
-      // 避免重复初始化
       if (!columnId || taskSortables.has(columnId)) return;
 
       const sortable = Sortable.create(container as HTMLElement, {
         animation: 200,
         easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
-        group: 'tasks', // 设置相同的 group 允许跨列拖拽！
-        draggable: '.task-card',
+        group: 'tasks',
+        draggable: '[data-task-id]', // 支持所有带 data-task-id 的元素
         ghostClass: 'task-ghost',
         chosenClass: 'task-chosen',
         dragClass: 'task-drag',
         forceFallback: true,
         fallbackOnBody: true,
-        swapThreshold: 0.65, // 拖拽交换阈值
-        onEnd: (evt) => {
-          const taskId = (evt.item as HTMLElement).dataset.taskId;
-          const fromColumnId = (evt.from as HTMLElement).dataset.columnId;
-          const toColumnId = (evt.to as HTMLElement).dataset.columnId;
+        swapThreshold: 0.65,
+        onMove: (evt) => {
+          // 检查是否拖拽到任务卡片上
+          const relatedElement = evt.related as HTMLElement;
+          const isTaskCard = relatedElement?.dataset?.taskCard === 'true';
+          const targetTaskId = relatedElement?.dataset?.taskId;
           
-          if (!taskId || !toColumnId) return;
-          
-          // 获取目标列的所有任务ID，形成新顺序
-          const taskCards = Array.from(evt.to.querySelectorAll('.task-card'));
-          const taskIds = taskCards
-            .map(el => (el as HTMLElement).dataset.taskId)
-            .filter((id): id is string => !!id);
-          
-          // 处理跨列移动逻辑
-          if (fromColumnId !== toColumnId) {
-            taskStore.moveTask(taskId, toColumnId, evt.newIndex);
+          if (isTaskCard && targetTaskId) {
+            // 禁止拖拽到已是子任务的卡片上（禁止三级任务）
+            const targetTask = taskStore.tasks.find(t => t.id === targetTaskId);
+            if (targetTask && !targetTask.parentId) {
+               relatedElement.classList.add('task-drop-target');
+            }
           }
           
-          // 更新目标列内的任务排序
-          taskStore.reorderTasks(toColumnId, projectId.value, taskIds);
+          return true; // 允许移动
+        },
+        onStart: () => { isDragging = true; },
+        onEnd: (evt) => {
+          // 移除所有悬停效果
+          document.querySelectorAll('.task-drop-target').forEach(el => {
+            el.classList.remove('task-drop-target');
+          });
+          
+          const taskId = (evt.item as HTMLElement).dataset.taskId;
+          if (!taskId) {
+            isDragging = false;
+            return;
+          }
+          
+          const task = taskStore.tasks.find(t => t.id === taskId);
+          if (!task) {
+            isDragging = false;
+            return;
+          }
+          
+          // 注意：不要手动移除 DOM 元素！
+          // SortableJS 会处理 DOM移动，而我们通过更新 Vue Store 来最终同步状态。
+          // 当 Store 更新后，Vue 会重新渲染列表，覆盖 SortableJS 的 DOM 操作。
+          
+          // 如果拖拽没有改变位置（同列表同索引），直接返回
+          if (evt.to === evt.from && evt.newIndex === evt.oldIndex) {
+            isDragging = false;
+            return;
+          }
+
+          // 恢复 DOM 状态，让 Vue 来处理渲染
+          // 这是防止 SortableJS 的 DOM 操作与 Vue 的 Virtual DOM 冲突的关键
+          // 特别是在跨组件拖拽时
+          const { from, item, oldIndex } = evt;
+          if (from.contains(item)) {
+            from.removeChild(item);
+            // 只有当 oldIndex 有效时才插回去
+            if (oldIndex !== undefined) {
+               if (oldIndex < from.children.length) {
+                 from.insertBefore(item, from.children[oldIndex]);
+               } else {
+                 from.appendChild(item);
+               }
+            }
+          }
+          
+          // 检测拖拽目标
+          const toElement = evt.to as HTMLElement;
+          const toColumnId = toElement.dataset.columnId;
+          
+          // 检查是否拖拽到了子任务容器
+          const isSubtaskContainer = toElement.dataset.subtaskContainer === 'true';
+          const parentTaskId = toElement.dataset.parentTaskId;
+          
+          // 检查是否拖拽到了任务卡片上（通过检查 related 元素）
+          // 在 onEnd 中，evt.originalEvent 还没结束，可以使用 document.elementFromPoint
+          // 但此时 item 还在鼠标位置，可能会遮挡目标。
+          // 更好的方式是利用 onMove 中记录的目标，或者尝试获取
+          // 这里我们简单尝试获取
+          let targetTaskId: string | undefined;
+          
+          // 如果拖拽到了某个特定的 drop target
+          // 由于我们在 onMove 中添加了类，我们可以尝试查找
+          // 但 onEnd 时类已经被移除了（上面代码）。
+          // 实际上 elementFromPoint 可能不准。
+          // 我们依赖于 SortableJS 的行为：如果它不仅是排序，还能嵌套...
+          // 但 Sortable 默认是一维列表。
+          // 我们之前是通过检查位置来判定是否拖拽到了任务卡片上。
+          // 现在的逻辑：如果 sortable 没能把元素放进子任务列表（因为子任务列表是另一个 sortable group），
+          // 那么它一定是在看板列里。
+          // 但我们想支持“拖到任务上变成子任务”。这需要我们检测鼠标位置下的元素。
+          
+          // 使用 clientX/Y 获取 drop 目标
+          const touch = (evt as any).originalEvent.changedTouches ? (evt as any).originalEvent.changedTouches[0] : (evt as any).originalEvent;
+          const clientX = touch.clientX;
+          const clientY = touch.clientY;
+          
+          // 临时隐藏拖拽元素以获取下方元素
+          const displayStyle = item.style.display;
+          item.style.display = 'none';
+          const elementBelow = document.elementFromPoint(clientX, clientY);
+          item.style.display = displayStyle;
+          
+          const targetTaskCard = elementBelow?.closest('[data-task-card="true"]') as HTMLElement;
+          targetTaskId = targetTaskCard?.dataset?.taskId;
+          
+          // 如果是拖拽到任务卡片上
+          if (targetTaskId && targetTaskId !== taskId) {
+             const targetTask = taskStore.tasks.find(t => t.id === targetTaskId);
+             
+             // 禁止拖拽到已是子任务的卡片上（禁止三级任务）
+             if (targetTask && !targetTask.parentId) {
+                // 检查是否从已完成列拖拽出来
+                const fromCompletedColumn = task.columnId === columnStore.completedColumnId;
+                const shouldBeCompleted = fromCompletedColumn ? false : targetTask.completed;
+                
+                // 递归移动所有子任务
+                moveTaskWithChildren(taskId, targetTaskId, shouldBeCompleted);
+                
+                nextTick(() => { isDragging = false; });
+                return;
+             }
+          }
+          
+          if (isSubtaskContainer && parentTaskId && parentTaskId !== taskId) {
+            // 拖拽到子任务容器,成为子任务
+            const parentTask = taskStore.tasks.find(t => t.id === parentTaskId);
+            const fromCompletedColumn = task.columnId === columnStore.completedColumnId;
+            const shouldBeCompleted = fromCompletedColumn ? false : (parentTask?.completed || false);
+            
+            moveTaskWithChildren(taskId, parentTaskId, shouldBeCompleted);
+            
+            // 更新子任务顺序
+            // 注意：因为我们手动恢复了 DOM，所以通过 store 更新来驱动
+            // 但我们需要知道新顺序。
+            // 简单的做法：把当前 taskId 放到新位置。
+            // 但由于我们没有让 Sortable 完成 DOM 移动，
+            // 我们不能简单读取 DOM 顺序。
+            // 这里我们需要依赖 evt.newIndex，但这在跨列表时可能不准，取决于 Sortable 的实现。
+            
+            // 更可靠的做法：
+            // 1. 获取目标父任务的子任务列表
+            // 2. 根据 newIndex 插入
+            nextTick(() => {
+               // subtasks was unused
+               isDragging = false;
+            });
+            return;
+          } 
+          
+          if (toColumnId) {
+            // 拖拽到看板列
+            const fromColumnId = (evt.from as HTMLElement).dataset.columnId;
+            const isSubtaskToBoard = !!task.parentId;
+            const isCompletedColumn = columnStore.completedColumnId === toColumnId;
+            const fromCompletedColumn = fromColumnId === columnStore.completedColumnId;
+            
+            // 目标列的任务 ID 列表
+            // 因为我们恢复了 DOM，所以 DOM 里的顺序是旧的。
+            // 我们需要根据 evt.newIndex 来计算新顺序。
+            
+            const targetColumnTasks = getColumnTasks(toColumnId);
+            const targetTaskIds = targetColumnTasks.map(t => t.id);
+            
+            // 如果是跨列或者是子任务变一级任务
+            if (fromColumnId !== toColumnId || isSubtaskToBoard) {
+               // 从源列表移除（如果是同列表则不需要，但在 taskStore.tasks 里只要修改 columnId 就会变）
+               // 我们只要把 taskId 插到 targetTaskIds 的 newIndex 位置
+               
+               // 如果是从别的列来的，targetTaskIds 里现在没有它。
+               targetTaskIds.splice(evt.newIndex!, 0, taskId);
+            } else {
+               // 同列排序
+               const oldIdx = targetTaskIds.indexOf(taskId);
+               if (oldIdx > -1) {
+                 targetTaskIds.splice(oldIdx, 1);
+                 targetTaskIds.splice(evt.newIndex!, 0, taskId);
+               }
+            }
+            
+            if (isSubtaskToBoard) {
+              // 子任务转一级任务
+              const shouldBeCompleted = isCompletedColumn;
+              taskStore.updateTask(taskId, {
+                parentId: undefined,
+                columnId: toColumnId,
+                projectId: projectId.value || task.projectId,
+                completed: shouldBeCompleted,
+              });
+              
+              if (fromCompletedColumn && !isCompletedColumn) {
+                recursiveUpdateCompletion(taskId, false);
+              } else if (isCompletedColumn) {
+                recursiveUpdateCompletion(taskId, true);
+              }
+            } else if (fromColumnId !== toColumnId) {
+              // 跨列移动
+              const shouldBeCompleted = isCompletedColumn;
+              taskStore.updateTask(taskId, {
+                columnId: toColumnId,
+                completed: shouldBeCompleted,
+              });
+              
+              if (fromCompletedColumn && !isCompletedColumn) {
+                recursiveUpdateCompletion(taskId, false);
+              } else if (isCompletedColumn) {
+                recursiveUpdateCompletion(taskId, true);
+              }
+            }
+            
+            // 应用新顺序
+            nextTick(() => {
+              taskStore.reorderTasks(toColumnId, projectId.value, targetTaskIds);
+              isDragging = false;
+            });
+          } else {
+            // 既不是子任务容器，也不是看板列，可能是拖飞了
+            isDragging = false;
+          }
         },
       });
       
@@ -299,30 +514,96 @@ function initSortables() {
   });
 }
 
-// 销毁 Sortable
+/**
+ * 递归移动任务及其所有子任务到新的父任务下
+ */
+/**
+ * 递归移动任务及其所有子任务到新的父任务下
+ */
+function moveTaskWithChildren(taskId: string, newParentId: string, shouldBeCompleted: boolean) {
+  const task = taskStore.tasks.find(t => t.id === taskId);
+  const newParent = taskStore.tasks.find(t => t.id === newParentId);
+  if (!task || !newParent) return;
+  
+  // 更新当前任务
+  taskStore.updateTask(taskId, {
+    parentId: newParentId,
+    projectId: newParent.projectId, // 继承父任务的项目 ID
+    columnId: newParent.columnId,   // 继承父任务的列 ID
+    completed: shouldBeCompleted,
+  });
+  
+  // 递归更新所有子任务的配置（项目、列、完成状态）
+  recursiveUpdateChildrenConfig(taskId, newParent.projectId, newParent.columnId, shouldBeCompleted);
+}
+
+/**
+ * 递归更新子任务的配置 (Project, Column, Completion)
+ */
+function recursiveUpdateChildrenConfig(parentId: string, projectId: string, columnId: string, shouldBeCompleted: boolean) {
+  const children = taskStore.getSubtasks(parentId);
+  children.forEach(child => {
+    taskStore.updateTask(child.id, {
+      projectId: projectId,
+      columnId: columnId,
+      completed: shouldBeCompleted,
+    });
+    recursiveUpdateChildrenConfig(child.id, projectId, columnId, shouldBeCompleted);
+  });
+}
+
+/**
+ * 递归更新任务及其所有子任务的完成状态
+ */
+function recursiveUpdateCompletion(taskId: string, shouldBeCompleted: boolean) {
+  const children = taskStore.getSubtasks(taskId);
+  children.forEach(child => {
+    taskStore.updateTask(child.id, {
+      completed: shouldBeCompleted,
+    });
+    recursiveUpdateCompletion(child.id, shouldBeCompleted);
+  });
+}
+
+// 仅销毁任务 Sortable 实例
+function destroyTaskSortables() {
+  taskSortables.forEach(sortable => sortable.destroy());
+  taskSortables.clear();
+}
+
+// 销毁所有 Sortable 实例
 function destroySortables() {
   if (columnSortable) {
     columnSortable.destroy();
     columnSortable = null;
   }
-  taskSortables.forEach(sortable => sortable.destroy());
-  taskSortables.clear();
+  destroyTaskSortables();
 }
 
-// 监听列变化，重新初始化任务排序
+// 拖拽进行中标记，避免 onEnd 中 store 更新触发不必要的重建
+let isDragging = false;
+
+// 监听列变化，重新初始化所有拖拽实例
 watch(
   () => sortedColumns.value.map(c => c.id).join(','),
   () => {
+    if (isDragging) return;
     nextTick(() => {
-      // 清理已删除列的 sortable
-      const currentColumnIds = new Set(sortedColumns.value.map(c => c.id));
-      taskSortables.forEach((_, columnId) => {
-        if (!currentColumnIds.has(columnId)) {
-          taskSortables.get(columnId)?.destroy();
-          taskSortables.delete(columnId);
-        }
-      });
+      destroySortables();
       initSortables();
+    });
+  }
+);
+
+// 监听任务数据变化，重建任务拖拽实例
+// 当任务增删或属性变化导致 Vue 重渲染 DOM 后，旧的 Sortable 绑定会失效
+watch(
+  () => taskStore.tasks.map(t => `${t.id}:${t.columnId}:${t.parentId}:${t.order}:${t.completed}`).join(','),
+  () => {
+    if (isDragging) return;
+    nextTick(() => {
+      destroyTaskSortables();
+      initTaskSortables();
     });
   }
 );
@@ -439,9 +720,15 @@ function cancelAddColumn() {
 
 // 快速添加任务 - 改为打开 TaskDetailModal
 function startQuickAdd(columnId: string) {
+  let targetProjectId = projectId.value;
+  // 如果是总览模式（无特定项目ID），且存在项目，默认选择第一个项目
+  if (!targetProjectId && projectStore.projects.length > 0) {
+    targetProjectId = projectStore.projects[0].id;
+  }
+
   // 打开 TaskDetailModal，预设当前项目和列
   openNewTask({
-    projectId: projectId.value || undefined,
+    projectId: targetProjectId,
     columnId: columnId,
   });
 }
@@ -492,7 +779,6 @@ const taskMenuItems = computed(() => {
    });
 
    items.push({ separator: true });
-   items.push({ separator: true });
    items.push({ label: t('task.trash'), action: 'trash', icon: Trash2, class: 'text-red-600' });
    items.push({ label: t('task.delete_permanently'), action: 'delete-permanently', icon: Trash2, class: 'text-red-700 bg-red-50 dark:bg-red-900/10' });
    
@@ -516,9 +802,14 @@ async function handleMenuSelect(action: string) {
       taskStore.updateTask(task.id, { priority: p });
    } else if (action.startsWith('move-project:')) {
       const projectId = action.replace('move-project:', '');
-      taskStore.updateTask(task.id, { projectId });
+      // 移动项目时，如果是子任务，则变为一级任务
+      taskStore.updateTask(task.id, { projectId, parentId: undefined });
    } else if (action.startsWith('move-column:')) {
       const columnId = action.replace('move-column:', '');
+      // 移动列时，如果是子任务，先清除 parentId 变为一级任务
+      if (task.parentId) {
+         taskStore.updateTask(task.id, { parentId: undefined });
+      }
       taskStore.moveTask(task.id, columnId);
    }
    
@@ -528,16 +819,22 @@ async function handleMenuSelect(action: string) {
 
 <style>
 /* 任务卡片容器 - 确保拖拽时样式一致 */
-.task-card {
+.task-card-wrapper {
   border-radius: 12px;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
   will-change: transform;
-  -webkit-user-drag: element;
   cursor: grab;
 }
 
-.task-card:active {
+.task-card-wrapper:active {
   cursor: grabbing;
+}
+
+/* 拖拽悬停目标效果 */
+.task-drop-target {
+  border: 2px solid #3b82f6 !important;
+  background-color: rgba(59, 130, 246, 0.05) !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
 }
 
 /* 列拖拽样式 */

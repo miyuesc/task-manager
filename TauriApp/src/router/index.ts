@@ -42,6 +42,11 @@ const routes: Array<RouteRecordRaw> = [
     name: "LabelView",
     component: () => import("../views/ListView.vue"), // Label views are lists
   },
+  {
+    path: "/overview",
+    name: "Overview",
+    component: () => import("../views/BoardView.vue"),
+  },
 ];
 
 const router = createRouter({

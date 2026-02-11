@@ -16,17 +16,19 @@
         v-for="subtask in subtasks" 
         :key="subtask.id"
         class="flex items-center gap-2.5 px-2 py-1.5 hover:bg-gray-50 dark:hover:bg-zinc-800/50 rounded-lg group cursor-pointer transition-colors"
+        :class="{ 'opacity-50 grayscale': subtask.isTrashed }"
         @click="$emit('open', subtask.id)"
       >
         <input 
           type="checkbox" 
           :checked="subtask.completed"
+          :disabled="subtask.isTrashed"
           @click.stop="$emit('toggle', subtask)"
-          class="w-4 h-4 rounded border-gray-300 dark:border-zinc-600 text-blue-500 focus:ring-blue-500 cursor-pointer"
+          class="w-4 h-4 rounded border-gray-300 dark:border-zinc-600 text-blue-500 focus:ring-blue-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         />
         <span 
           class="flex-1 text-sm"
-          :class="subtask.completed ? 'line-through text-gray-400' : 'text-gray-700 dark:text-gray-300'"
+          :class="subtask.completed || subtask.isTrashed ? 'line-through text-gray-400' : 'text-gray-700 dark:text-gray-300'"
         >
           {{ subtask.title }}
           <span 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted } from 'vue';
+import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import Sortable from 'sortablejs';
@@ -7,8 +7,9 @@ import {
   CheckSquare, Calendar, Clock, 
   Settings, Plus, Tag, ChevronLeft, ChevronRight,
   Pencil, Palette, Trash2,
-  Inbox, CheckCircle
+  Inbox, CheckCircle, LayoutGrid
 } from 'lucide-vue-next';
+import { useTaskStore } from '@/stores/task';
 import { useProjectStore } from '@/stores/project';
 import { useLabelStore } from '@/stores/label';
 import { useSettingsStore } from '@/stores/settings';
@@ -18,6 +19,7 @@ const { t } = useI18n();
 const router = useRouter();
 const route = useRoute();
 
+const taskStore = useTaskStore();
 const projectStore = useProjectStore();
 const labelStore = useLabelStore();
 const settingsStore = useSettingsStore();
@@ -36,20 +38,19 @@ const navItems = [
   { name: 'trash', path: '/smart/trash', icon: Trash2, iconColor: 'text-red-500' },
 ];
 
-const visibleNavItems = computed(() => {
-  if (isCollapsed.value) {
-    return navItems.filter(item => ['progressing', 'today', 'upcoming'].includes(item.name));
-  }
-  return navItems;
-});
-
 function isActive(path: string) {
   return route.path === path;
 }
 
-function getNavCount(_name: string) {
-  // TODO: Implement real counts from taskStore
-  return 0;
+function getNavCount(name: string) {
+  switch (name) {
+    case 'progressing': return taskStore.progressingTasks.length;
+    case 'today': return taskStore.todayTasks.length;
+    case 'upcoming': return taskStore.upcomingTasks.length;
+    case 'completed': return taskStore.completedTasks.length;
+    case 'trash': return taskStore.trashedTasks.length;
+    default: return 0;
+  }
 }
 
 // Project Logic
@@ -247,6 +248,9 @@ const sidebarWidth = computed(() => isCollapsed.value ? 'w-16' : 'w-60');
 
 // 拖拽排序 (SortableJS)
 onMounted(() => {
+  // 添加全局点击监听,关闭右键菜单和颜色选择器
+  document.addEventListener('click', handleGlobalClick);
+
   if (projectsListRef.value) {
     Sortable.create(projectsListRef.value, {
       animation: 250,
@@ -287,29 +291,17 @@ onMounted(() => {
     });
   }
 });
+
+onUnmounted(() => {
+  // 清理全局点击监听
+  document.removeEventListener('click', handleGlobalClick);
+});
 </script>
 
 <template>
   <aside 
-    :class="[sidebarWidth, 'h-full bg-white dark:bg-zinc-950 border-r border-gray-100 dark:border-zinc-800 flex flex-col transition-all duration-300 ease-in-out relative group/sidebar']"
-    @click="handleGlobalClick"
+    :class="[sidebarWidth, 'h-full bg-white dark:bg-zinc-950 border-r border-gray-100 dark:border-zinc-800 flex flex-col transition-all duration-300 ease-in-out']"
   >
-    <!-- Divider Line Control (Toggle Button) -->
-    <div 
-      class="absolute -right-3 top-1/2 -translate-y-1/2 z-50 opacity-0 group-hover/sidebar:opacity-100 transition-opacity delay-100"
-      @click.stop="toggleCollapse"
-    >
-      <div class="flex items-center justify-center w-6 h-12 cursor-pointer group/toggle">
-        <!-- Vertical Line Part -->
-        <div class="absolute h-full w-0.5 bg-transparent group-hover/toggle:bg-blue-500/50 transition-colors rounded-full"></div>
-        
-        <!-- Icon Bubble -->
-        <div class="relative w-6 h-6 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-full flex items-center justify-center shadow-sm text-gray-400 group-hover/toggle:text-blue-500 group-hover/toggle:border-blue-200 dark:group-hover/toggle:border-blue-800 transition-all transform scale-90 group-hover/toggle:scale-100">
-             <ChevronRight v-if="isCollapsed" class="w-3.5 h-3.5" />
-             <ChevronLeft v-else class="w-3.5 h-3.5" />
-        </div>
-      </div>
-    </div>
     <!-- Logo Area -->
     <div class="h-14 flex items-center px-4 shrink-0" data-tauri-drag-region>
       <div class="flex items-center gap-2.5 cursor-pointer transition-opacity hover:opacity-80" @click="router.push('/')">
@@ -324,26 +316,38 @@ onMounted(() => {
     <nav class="flex-1 overflow-y-auto overflow-x-hidden py-3 px-2 space-y-6">
       <!-- Standard Views -->
       <div class="space-y-0.5">
-        <template v-for="item in visibleNavItems" :key="item.name">
+        <template v-for="item in navItems" :key="item.name">
           <router-link 
             :to="item.path" 
-            class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors"
-            :class="isActive(item.path) 
-              ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' 
-              : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800/50'"
+            class="flex items-center rounded-lg transition-all duration-300"
+            :class="[
+              isActive(item.path) 
+                ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' 
+                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800/50',
+              isCollapsed ? 'justify-center w-10 h-10 mx-auto gap-0' : 'justify-start w-full px-3 h-10 gap-3'
+            ]"
             :title="isCollapsed ? t('sidebar.' + item.name) : undefined"
           >
-            <component :is="item.icon" class="w-5 h-5 shrink-0" :class="isActive(item.path) ? 'text-blue-600 dark:text-blue-400' : item.iconColor" />
-            <span v-if="!isCollapsed" class="truncate">{{ t('sidebar.' + item.name) }}</span>
-            <span v-if="!isCollapsed && getNavCount(item.name) > 0" class="ml-auto text-xs text-gray-400">{{ getNavCount(item.name) }}</span>
+            <component :is="item.icon" class="w-5 h-5 shrink-0 transition-all duration-300" :class="isActive(item.path) ? 'text-blue-600 dark:text-blue-400' : item.iconColor" />
+            
+            <span 
+              class="flex items-center overflow-hidden transition-all duration-300 origin-left"
+              :class="isCollapsed ? 'w-0 opacity-0' : 'w-full opacity-100'"
+            >
+              <span class="truncate flex-1">{{ t('sidebar.' + item.name) }}</span>
+              <span v-if="getNavCount(item.name) > 0" class="ml-auto text-xs text-gray-400 shrink-0">{{ getNavCount(item.name) }}</span>
+            </span>
           </router-link>
         </template>
       </div>
 
       <!-- Projects -->
-      <div v-if="!isCollapsed">
-        <div class="flex items-center justify-between px-3 mb-2">
-          <h3 class="text-xs font-semibold text-gray-400 dark:text-zinc-500 uppercase tracking-wider">{{ t('sidebar.projects') }}</h3>
+      <div>
+        <div 
+          class="flex items-center justify-between px-3 mb-2 transition-all duration-300 overflow-hidden"
+          :class="isCollapsed ? 'opacity-0 h-0 mb-0' : 'opacity-100 h-6'"
+        >
+          <h3 class="text-xs font-semibold text-gray-400 dark:text-zinc-500 uppercase tracking-wider whitespace-nowrap">{{ t('sidebar.projects') }}</h3>
           <button 
             @click.stop="startAddProject"
             class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1 -mr-1 rounded hover:bg-gray-100 dark:hover:bg-zinc-800"
@@ -351,42 +355,83 @@ onMounted(() => {
             <Plus class="w-4 h-4" />
           </button>
         </div>
+        
+        <!-- Overview Project View -->
+        <router-link 
+            to="/overview" 
+            class="flex items-center rounded-lg transition-all duration-300 mb-0.5"
+            :class="[
+                  isActive('/overview') 
+                    ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' 
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800/50',
+                  isCollapsed ? 'justify-center w-10 h-9 mx-auto gap-0' : 'justify-start w-full px-3 h-9 gap-3'
+            ]"
+            :title="isCollapsed ? t('sidebar.overview') : undefined"
+        >
+            <LayoutGrid class="w-4 h-4 shrink-0" :class="isActive('/overview') ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400'" />
+            <span 
+               class="truncate transition-all duration-300 origin-left"
+               :class="isCollapsed ? 'w-0 opacity-0' : 'w-full opacity-100'"
+            >
+               {{ t('sidebar.overview') }}
+            </span>
+        </router-link>
+
         <div class="space-y-0.5" ref="projectsListRef">
           <template v-for="project in projectStore.projects" :key="project.id">
-            <!-- 编辑模式 -->
-            <div 
-              v-if="editingProjectId === project.id"
-              class="flex items-center gap-3 px-3 h-9"
-            >
-              <span class="w-2.5 h-2.5 rounded-full shrink-0" :class="getColorClass(project.color, 'bg')"></span>
-              <input 
-                ref="editInput"
-                v-model="editingName"
-                @keydown.enter="saveProjectName"
-                @keydown.escape="editingProjectId = null"
-                @blur="saveProjectName"
-                class="flex-1 min-w-0 text-sm bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded px-2 h-7 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <!-- 正常显示 -->
-            <div v-else :data-id="project.id">
-              <router-link 
-                :to="`/project/${project.id}/${activeProjectView}`"
-                @dblclick="startEditProject(project)"
-                @contextmenu="showContextMenu($event, 'project', project.id)"
-                class="flex items-center gap-3 px-3 h-9 text-sm font-medium rounded-lg transition-all group"
-                :class="isProjectActive(project.id) 
-                  ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' 
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800/50'"
+            <!-- Project Item Wrapper -->
+            <div :data-id="project.id">
+              <!-- Edit View -->
+              <div 
+                v-if="editingProjectId === project.id && !isCollapsed"
+                class="flex items-center gap-3 px-3 h-9"
               >
-                <span class="w-2.5 h-2.5 rounded-full shrink-0 transition-transform group-hover:scale-110" :class="getColorClass(project.color, 'bg')"></span>
-                <span class="truncate">{{ project.name }}</span>
+                <span class="w-2.5 h-2.5 rounded-full shrink-0" :class="getColorClass(project.color, 'bg')"></span>
+                <input 
+                  ref="editInput"
+                  v-model="editingName"
+                  @keydown.enter="saveProjectName"
+                  @keydown.escape="editingProjectId = null"
+                  @blur="saveProjectName"
+                  class="flex-1 min-w-0 text-sm bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded px-2 h-7 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <!-- Standard View -->
+              <router-link 
+                v-else
+                :to="`/project/${project.id}/${activeProjectView}`"
+                @dblclick="!isCollapsed && startEditProject(project)"
+                @contextmenu="showContextMenu($event, 'project', project.id)"
+                class="flex items-center rounded-lg transition-all duration-300 group"
+                :class="[
+                  isProjectActive(project.id) 
+                    ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' 
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800/50',
+                  isCollapsed ? 'justify-center w-10 h-9 mx-auto gap-0' : 'justify-start w-full px-3 h-9 gap-3'
+                ]"
+                :title="isCollapsed ? project.name : undefined"
+              >
+                <span 
+                  class="rounded-full shrink-0 transition-all duration-300"
+                  :class="[
+                    getColorClass(project.color, 'bg'),
+                    isCollapsed ? 'w-3 h-3' : 'w-2.5 h-2.5 group-hover:scale-110'
+                  ]"
+                ></span>
+                
+                <span 
+                  class="truncate transition-all duration-300 origin-left"
+                  :class="isCollapsed ? 'w-0 opacity-0' : 'w-full opacity-100'"
+                >
+                  {{ project.name }}
+                </span>
               </router-link>
             </div>
           </template>
 
-          <!-- 新增项目输入框 (Moved to bottom) -->
-          <div v-if="isAddingProject" class="flex items-center gap-3 px-3 h-9">
+          <!-- Add Project Input -->
+          <div v-if="isAddingProject && !isCollapsed" class="flex items-center gap-3 px-3 h-9">
             <span class="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0"></span>
             <input 
               ref="newItemInput"
@@ -400,26 +445,13 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- Collapsed Projects -->
-      <div v-else class="space-y-1">
-        <template v-for="project in projectStore.projects" :key="project.id">
-          <router-link 
-            :to="`/project/${project.id}/${activeProjectView}`"
-            class="flex items-center justify-center w-10 h-10 mx-auto rounded-lg transition-all"
-            :class="isProjectActive(project.id) 
-              ? 'bg-blue-50 dark:bg-blue-900/20' 
-              : 'hover:bg-gray-50 dark:hover:bg-zinc-800/50'"
-            :title="project.name"
-          >
-            <span class="w-3 h-3 rounded-full" :class="getColorClass(project.color, 'bg')"></span>
-          </router-link>
-        </template>
-      </div>
-
       <!-- Labels -->
-      <div v-if="!isCollapsed">
-        <div class="flex items-center justify-between px-3 mb-2">
-          <h3 class="text-xs font-semibold text-gray-400 dark:text-zinc-500 uppercase tracking-wider">{{ t('sidebar.labels') }}</h3>
+      <div>
+        <div 
+          class="flex items-center justify-between px-3 mb-2 transition-all duration-300 overflow-hidden"
+          :class="isCollapsed ? 'opacity-0 h-0 mb-0' : 'opacity-100 h-6'"
+        >
+          <h3 class="text-xs font-semibold text-gray-400 dark:text-zinc-500 uppercase tracking-wider whitespace-nowrap">{{ t('sidebar.labels') }}</h3>
           <button 
             @click.stop="startAddLabel"
             class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1 -mr-1 rounded hover:bg-gray-100 dark:hover:bg-zinc-800"
@@ -427,42 +459,61 @@ onMounted(() => {
             <Plus class="w-4 h-4" />
           </button>
         </div>
+
         <div class="space-y-0.5" ref="labelsListRef">
           <template v-for="label in labelStore.labels" :key="label.id">
-            <!-- 编辑模式 -->
-            <div 
-              v-if="editingLabelId === label.id"
-              class="flex items-center gap-3 px-3 h-9"
-            >
-              <Tag class="w-4 h-4 shrink-0" :class="getColorClass(label.color, 'text')" />
-              <input 
-                ref="editInput"
-                v-model="editingName"
-                @keydown.enter="saveLabelName"
-                @keydown.escape="editingLabelId = null"
-                @blur="saveLabelName"
-                class="flex-1 min-w-0 text-sm bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded px-2 h-7 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <!-- 正常显示 -->
-            <div v-else :data-id="label.id">
-              <router-link 
-                :to="`/label/${label.id}`"
-                @dblclick="startEditLabel(label)"
-                @contextmenu="showContextMenu($event, 'label', label.id)"
-                class="flex items-center gap-3 px-3 h-9 text-sm font-medium rounded-lg transition-all group"
-                :class="isLabelActive(label.id) 
-                  ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' 
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800/50'"
+            <div :data-id="label.id">
+              <!-- Edit View -->
+              <div 
+                v-if="editingLabelId === label.id && !isCollapsed"
+                class="flex items-center gap-3 px-3 h-9"
               >
-                <Tag class="w-4 h-4 shrink-0 transition-transform group-hover:scale-110" :class="getColorClass(label.color, 'text')" />
-                <span class="truncate">{{ label.name }}</span>
+                <Tag class="w-4 h-4 shrink-0" :class="getColorClass(label.color, 'text')" />
+                <input 
+                  ref="editInput"
+                  v-model="editingName"
+                  @keydown.enter="saveLabelName"
+                  @keydown.escape="editingLabelId = null"
+                  @blur="saveLabelName"
+                  class="flex-1 min-w-0 text-sm bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded px-2 h-7 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <!-- Standard View -->
+              <router-link 
+                v-else
+                :to="`/label/${label.id}`"
+                @dblclick="!isCollapsed && startEditLabel(label)"
+                @contextmenu="showContextMenu($event, 'label', label.id)"
+                class="flex items-center rounded-lg transition-all duration-300 group"
+                :class="[
+                  isLabelActive(label.id) 
+                    ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' 
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800/50',
+                  isCollapsed ? 'justify-center w-10 h-9 mx-auto gap-0' : 'justify-start w-full px-3 h-9 gap-3'
+                ]"
+                :title="isCollapsed ? label.name : undefined"
+              >
+                <Tag 
+                  class="shrink-0 transition-all duration-300" 
+                  :class="[
+                    getColorClass(label.color, 'text'),
+                    isCollapsed ? 'w-4 h-4' : 'w-4 h-4 group-hover:scale-110'
+                  ]" 
+                />
+                
+                <span 
+                  class="truncate transition-all duration-300 origin-left"
+                  :class="isCollapsed ? 'w-0 opacity-0' : 'w-full opacity-100'"
+                >
+                  {{ label.name }}
+                </span>
               </router-link>
             </div>
           </template>
 
-          <!-- 新增标签输入框 (Moved to bottom) -->
-          <div v-if="isAddingLabel" class="flex items-center gap-3 px-3 h-9">
+          <!-- Add Label Input -->
+          <div v-if="isAddingLabel && !isCollapsed" class="flex items-center gap-3 px-3 h-9">
             <Tag class="w-4 h-4 text-gray-400 shrink-0" />
             <input 
               ref="newItemInput"
@@ -475,45 +526,41 @@ onMounted(() => {
           </div>
         </div>
       </div>
-
-      <!-- Collapsed Labels -->
-      <div v-else class="space-y-1">
-        <template v-for="label in labelStore.labels" :key="label.id">
-          <router-link 
-            :to="`/label/${label.id}`"
-            class="flex items-center justify-center w-10 h-10 mx-auto rounded-lg transition-all"
-            :class="isLabelActive(label.id) 
-              ? 'bg-blue-50 dark:bg-blue-900/20' 
-              : 'hover:bg-gray-50 dark:hover:bg-zinc-800/50'"
-            :title="label.name"
-          >
-            <Tag class="w-4 h-4" :class="getColorClass(label.color, 'text')" />
-          </router-link>
-        </template>
-      </div>
     </nav>
 
     <!-- Bottom Actions -->
-    <div class="border-t border-gray-100 dark:border-zinc-800 shrink-0 p-2">
-      <!-- 展开状态：显示完整设置按钮 -->
-      <div v-if="!isCollapsed">
+    <div class="border-t border-gray-100 dark:border-zinc-800 shrink-0">
+      <!-- 展开状态：水平布局 -->
+      <div v-if="!isCollapsed" class="flex items-center h-12 px-2">
+        <!-- 展开/收起按钮（左侧） -->
+        <button 
+          @click="toggleCollapse"
+          class="flex items-center justify-center w-8 h-8 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+          :title="t('common.toggle_sidebar')"
+        >
+          <ChevronLeft class="w-5 h-5" />
+        </button>
+        <!-- 分割线 -->
+        <div class="w-px h-5 bg-gray-200 dark:bg-zinc-700 mx-2"></div>
+        
+        <!-- 设置按钮（右侧） -->
         <button 
           @click="settingsStore.openSettings()"
-          class="flex items-center gap-2 w-full px-2 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+          class="flex items-center gap-2 flex-1 px-2 py-1.5 text-sm font-medium text-gray-500 dark:text-gray-400 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
           :title="t('common.preferences')"
         >
           <Settings class="w-4 h-4 shrink-0" />
           <span>{{ t('common.preferences') }}</span>
         </button>
       </div>
-      <!-- 收起状态：显示图标 -->
-      <div v-else class="flex justify-center">
+      <!-- 收起状态：显示展开按钮 -->
+      <div v-else class="flex flex-col items-center justify-center py-2 gap-2">
         <button 
-          @click="settingsStore.openSettings()"
+          @click="toggleCollapse"
           class="flex items-center justify-center w-8 h-8 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
-          :title="t('common.preferences')"
+          :title="t('common.toggle_sidebar')"
         >
-          <Settings class="w-5 h-5" />
+          <ChevronRight class="w-5 h-5" />
         </button>
       </div>
     </div>

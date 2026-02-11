@@ -11,6 +11,7 @@ export default {
     completed: "Completed",
     trash: "Trash",
     dashboard: "Dashboard",
+    overview: "Overview",
   },
   view: {
     board: "Board",

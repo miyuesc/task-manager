@@ -63,14 +63,25 @@
                     @click.stop="openTask(layout.task.id)"
                 >
                     <div 
-                        class="px-2 py-0.5 rounded text-[11px] font-medium truncate shadow-sm border transition-all"
+                        class="px-2 py-0.5 rounded text-[11px] font-medium truncate shadow-sm border transition-all flex items-center gap-1"
                         :class="[
                             getTaskColorClass(layout.task),
                             layout.isStart ? 'rounded-l' : 'rounded-l-none border-l-0',
                             layout.isEnd ? 'rounded-r' : 'rounded-r-none border-r-0'
                         ]"
                     >
-                        {{ layout.showTitle ? layout.task.title : '&nbsp;' }}
+                        <template v-if="layout.showTitle">
+                          <template v-if="isOverviewRoute">
+                            <span 
+                              class="w-1.5 h-1.5 rounded-full shrink-0" 
+                              :style="{ backgroundColor: getProjectDotColor(layout.task.projectId) }"
+                            ></span>
+                            <span class="opacity-60 shrink-0">{{ getProjectName(layout.task.projectId) }}</span>
+                            <span class="truncate">{{ layout.task.title }}</span>
+                          </template>
+                          <span v-else class="truncate">{{ layout.task.title }}</span>
+                        </template>
+                        <span v-else>&nbsp;</span>
                     </div>
                 </div>
             </div>
@@ -84,15 +95,19 @@ import { ref, computed } from 'vue';
 import { useRoute } from 'vue-router';
 import { ChevronLeft, ChevronRight } from 'lucide-vue-next';
 import { useTaskStore, Task } from '@/stores/task';
+import { useProjectStore } from '@/stores/project';
 import { useTaskModal } from '@/composables/useTaskModal';
 import { getLocalDateISOString } from '@/utils/date';
 import { useI18n } from 'vue-i18n';
-import { TaskPriority, PRIORITY_CONFIG } from '@/constants/resources';
+import { TaskPriority, PRIORITY_CONFIG, COLOR_MAP } from '@/constants/resources';
 
 const { locale } = useI18n();
 const route = useRoute();
 const taskStore = useTaskStore();
+const projectStore = useProjectStore();
 const { openTask, openNewTask } = useTaskModal();
+
+const isOverviewRoute = computed(() => route.path.startsWith('/overview'));
 
 const currentDate = ref(new Date());
 
@@ -292,6 +307,19 @@ function getTaskColorClass(task: Task) {
     
     const config = PRIORITY_CONFIG[task.priority as TaskPriority];
     return config ? config.calendarClass : 'bg-blue-500/10 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800/50';
+}
+
+// 获取项目颜色（用于圆点标识）
+function getProjectDotColor(projectId: string): string {
+    const project = projectStore.getProject(projectId);
+    if (!project) return '#9CA3AF';
+    return COLOR_MAP[project.color] || '#9CA3AF';
+}
+
+// 获取项目名称
+function getProjectName(projectId: string): string {
+    const project = projectStore.getProject(projectId);
+    return project?.name || '';
 }
 </script>
 

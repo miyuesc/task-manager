@@ -114,6 +114,10 @@ const visibleLabels = computed(() => {
 });
 
 function isActive(path: string) {
+  // Overview 路由使用前缀匹配（/overview/list, /overview/calendar 等子路径也应高亮）
+  if (path === '/overview') {
+    return route.path.startsWith('/overview');
+  }
   return route.path === path;
 }
 

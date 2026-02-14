@@ -55,6 +55,7 @@
           >
             <TaskCard 
               :task="task" 
+              :showProject="isOverviewRoute"
               @click="openTask(task.id)" 
               @context-menu="handleTaskContextMenu"
             />
@@ -173,6 +174,7 @@ const taskStore = useTaskStore();
 const { openTask, openNewTask } = useTaskModal();
 
 const projectId = computed(() => route.params.id as string);
+const isOverviewRoute = computed(() => route.path.startsWith('/overview'));
 
 // DOM 引用
 // DOM 引用
@@ -274,6 +276,29 @@ function initSortables() {
  * 仅初始化任务拖拽实例（不影响列排序实例）
  */
 function initTaskSortables() {
+  // 追踪当前拖拽悬停的目标任务卡片（用于判断松手时是否应转为子任务）
+  let currentDropTargetId: string | null = null;
+  let draggedTaskId: string | null = null;
+  let dragMoveHandler: ((e: PointerEvent) => void) | null = null;
+
+  // 清除所有 drop target 高亮
+  function clearDropTargetHighlight() {
+    document.querySelectorAll('.task-drop-target').forEach(el => {
+      el.classList.remove('task-drop-target');
+    });
+  }
+
+  // 清理拖拽追踪状态
+  function cleanupDragTracking() {
+    if (dragMoveHandler) {
+      document.removeEventListener('pointermove', dragMoveHandler);
+      dragMoveHandler = null;
+    }
+    clearDropTargetHighlight();
+    currentDropTargetId = null;
+    draggedTaskId = null;
+  }
+
   nextTick(() => {
     // 1. 初始化看板列的任务容器
     const containers = document.querySelectorAll('.task-container');
@@ -285,35 +310,49 @@ function initTaskSortables() {
         animation: 200,
         easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
         group: 'tasks',
-        draggable: '[data-task-id]', // 支持所有带 data-task-id 的元素
+        draggable: '[data-task-id]',
         ghostClass: 'task-ghost',
         chosenClass: 'task-chosen',
         dragClass: 'task-drag',
         forceFallback: true,
         fallbackOnBody: true,
         swapThreshold: 0.65,
-        onMove: (evt) => {
-          // 检查是否拖拽到任务卡片上
-          const relatedElement = evt.related as HTMLElement;
-          const isTaskCard = relatedElement?.dataset?.taskCard === 'true';
-          const targetTaskId = relatedElement?.dataset?.taskId;
-          
-          if (isTaskCard && targetTaskId) {
-            // 禁止拖拽到已是子任务的卡片上（禁止三级任务）
-            const targetTask = taskStore.tasks.find(t => t.id === targetTaskId);
-            if (targetTask && !targetTask.parentId) {
-               relatedElement.classList.add('task-drop-target');
+        onMove: () => true,
+        onStart: (startEvt) => {
+          isDragging = true;
+          currentDropTargetId = null;
+          draggedTaskId = (startEvt.item as HTMLElement).dataset.taskId || null;
+
+          // 注册全局 pointermove，实时追踪鼠标下方的任务卡片
+          // 使用 pointermove 而非 onMove 的原因：
+          // SortableJS 的 onMove 只在排序位置变化时触发，
+          // 当鼠标离开卡片但排序不再变化时不触发，导致高亮无法清除
+          dragMoveHandler = (e: PointerEvent) => {
+            clearDropTargetHighlight();
+
+            const el = document.elementFromPoint(e.clientX, e.clientY);
+            const card = el?.closest('[data-task-card="true"]') as HTMLElement | null;
+            const hoveredTaskId = card?.dataset?.taskId;
+
+            if (card && hoveredTaskId && hoveredTaskId !== draggedTaskId) {
+              const targetTask = taskStore.tasks.find(t => t.id === hoveredTaskId);
+              if (targetTask && !targetTask.parentId) {
+                card.classList.add('task-drop-target');
+                currentDropTargetId = hoveredTaskId;
+                return;
+              }
             }
-          }
-          
-          return true; // 允许移动
+            currentDropTargetId = null;
+          };
+
+          document.addEventListener('pointermove', dragMoveHandler);
         },
-        onStart: () => { isDragging = true; },
         onEnd: (evt) => {
-          // 移除所有悬停效果
-          document.querySelectorAll('.task-drop-target').forEach(el => {
-            el.classList.remove('task-drop-target');
-          });
+          // 读取松手时的 drop target（pointermove 最后一次更新的值）
+          const finalDropTargetId = currentDropTargetId;
+
+          // 清理拖拽追踪
+          cleanupDragTracking();
           
           const taskId = (evt.item as HTMLElement).dataset.taskId;
           if (!taskId) {
@@ -327,10 +366,6 @@ function initTaskSortables() {
             return;
           }
           
-          // 注意：不要手动移除 DOM 元素！
-          // SortableJS 会处理 DOM移动，而我们通过更新 Vue Store 来最终同步状态。
-          // 当 Store 更新后，Vue 会重新渲染列表，覆盖 SortableJS 的 DOM 操作。
-          
           // 如果拖拽没有改变位置（同列表同索引），直接返回
           if (evt.to === evt.from && evt.newIndex === evt.oldIndex) {
             isDragging = false;
@@ -338,12 +373,9 @@ function initTaskSortables() {
           }
 
           // 恢复 DOM 状态，让 Vue 来处理渲染
-          // 这是防止 SortableJS 的 DOM 操作与 Vue 的 Virtual DOM 冲突的关键
-          // 特别是在跨组件拖拽时
           const { from, item, oldIndex } = evt;
           if (from.contains(item)) {
             from.removeChild(item);
-            // 只有当 oldIndex 有效时才插回去
             if (oldIndex !== undefined) {
                if (oldIndex < from.children.length) {
                  from.insertBefore(item, from.children[oldIndex]);
@@ -361,50 +393,17 @@ function initTaskSortables() {
           const isSubtaskContainer = toElement.dataset.subtaskContainer === 'true';
           const parentTaskId = toElement.dataset.parentTaskId;
           
-          // 检查是否拖拽到了任务卡片上（通过检查 related 元素）
-          // 在 onEnd 中，evt.originalEvent 还没结束，可以使用 document.elementFromPoint
-          // 但此时 item 还在鼠标位置，可能会遮挡目标。
-          // 更好的方式是利用 onMove 中记录的目标，或者尝试获取
-          // 这里我们简单尝试获取
-          let targetTaskId: string | undefined;
-          
-          // 如果拖拽到了某个特定的 drop target
-          // 由于我们在 onMove 中添加了类，我们可以尝试查找
-          // 但 onEnd 时类已经被移除了（上面代码）。
-          // 实际上 elementFromPoint 可能不准。
-          // 我们依赖于 SortableJS 的行为：如果它不仅是排序，还能嵌套...
-          // 但 Sortable 默认是一维列表。
-          // 我们之前是通过检查位置来判定是否拖拽到了任务卡片上。
-          // 现在的逻辑：如果 sortable 没能把元素放进子任务列表（因为子任务列表是另一个 sortable group），
-          // 那么它一定是在看板列里。
-          // 但我们想支持“拖到任务上变成子任务”。这需要我们检测鼠标位置下的元素。
-          
-          // 使用 clientX/Y 获取 drop 目标
-          const touch = (evt as any).originalEvent.changedTouches ? (evt as any).originalEvent.changedTouches[0] : (evt as any).originalEvent;
-          const clientX = touch.clientX;
-          const clientY = touch.clientY;
-          
-          // 临时隐藏拖拽元素以获取下方元素
-          const displayStyle = item.style.display;
-          item.style.display = 'none';
-          const elementBelow = document.elementFromPoint(clientX, clientY);
-          item.style.display = displayStyle;
-          
-          const targetTaskCard = elementBelow?.closest('[data-task-card="true"]') as HTMLElement;
-          targetTaskId = targetTaskCard?.dataset?.taskId;
-          
-          // 如果是拖拽到任务卡片上
-          if (targetTaskId && targetTaskId !== taskId) {
-             const targetTask = taskStore.tasks.find(t => t.id === targetTaskId);
+          // 判断是否应将任务变为子任务：
+          // 使用 pointermove 实时追踪的 finalDropTargetId，
+          // 仅当松手时鼠标确实停留在某个任务卡片上才触发
+          if (finalDropTargetId && finalDropTargetId !== taskId) {
+             const targetTask = taskStore.tasks.find(t => t.id === finalDropTargetId);
              
-             // 禁止拖拽到已是子任务的卡片上（禁止三级任务）
              if (targetTask && !targetTask.parentId) {
-                // 检查是否从已完成列拖拽出来
                 const fromCompletedColumn = task.columnId === columnStore.completedColumnId;
                 const shouldBeCompleted = fromCompletedColumn ? false : targetTask.completed;
                 
-                // 递归移动所有子任务
-                moveTaskWithChildren(taskId, targetTaskId, shouldBeCompleted);
+                moveTaskWithChildren(taskId, finalDropTargetId, shouldBeCompleted);
                 
                 nextTick(() => { isDragging = false; });
                 return;
@@ -891,6 +890,7 @@ async function handleMenuSelect(action: string) {
 /* 拖拽中禁用所有过渡动画，防止闪烁 */
 .sortable-fallback {
   transition: none !important;
+  pointer-events: none !important;
 }
 
 .sortable-ghost {

@@ -11,7 +11,7 @@ import { useRoute } from 'vue-router';
 const route = useRoute();
 
 const BoardView = defineAsyncComponent(() => import('./BoardView.vue'));
-const ListView = defineAsyncComponent(() => import('./ListView.vue'));
+const OverviewListView = defineAsyncComponent(() => import('./OverviewListView.vue'));
 const TimelineView = defineAsyncComponent(() => import('./TimelineView.vue'));
 const CalendarView = defineAsyncComponent(() => import('./CalendarView.vue'));
 
@@ -19,7 +19,7 @@ const CalendarView = defineAsyncComponent(() => import('./CalendarView.vue'));
 const currentViewComponent = computed(() => {
   const viewName = route.params.view as string;
   switch (viewName) {
-    case 'list': return ListView;
+    case 'list': return OverviewListView;
     case 'timeline': return TimelineView;
     case 'calendar': return CalendarView;
     case 'board':

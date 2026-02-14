@@ -68,6 +68,12 @@
         </span>
       </div>
 
+      <!-- 所属项目标签（仅在 showProject 时显示） -->
+      <div v-if="showProject && projectInfo" class="flex items-center gap-1.5 mt-2 ml-6">
+        <span class="w-2 h-2 rounded-full shrink-0" :class="projectInfo.colorClass"></span>
+        <span class="text-[11px] text-gray-400 dark:text-gray-500 truncate">{{ projectInfo.name }}</span>
+      </div>
+
       <!-- Subtasks Section -->
       <div v-if="subtasks.length > 0 || isSubtaskExpanded" class="mt-3">
         <!-- Subtask Header: Toggle + Progress Ring (仅在有子任务时显示) -->
@@ -120,15 +126,18 @@
 import { computed, ref } from 'vue';
 import { Task, useTaskStore } from '@/stores/task';
 import { useColumnStore } from '@/stores/column';
+import { useProjectStore } from '@/stores/project';
 import { ChevronDown, Clock } from 'lucide-vue-next';
 import { useI18n } from 'vue-i18n';
-import SubtaskList from './SubtaskList.vue'; // Import SubtaskList
+import SubtaskList from './SubtaskList.vue';
 import { markdownParser } from '@/utils/markdown';
+import { COLOR_BG_MAP } from '@/constants/resources';
 
 const { t, locale } = useI18n();
 
 const props = defineProps<{
-  task: Task
+  task: Task;
+  showProject?: boolean;
 }>();
 
 defineEmits<{
@@ -138,6 +147,7 @@ defineEmits<{
 
 const taskStore = useTaskStore();
 const columnStore = useColumnStore();
+const projectStore = useProjectStore();
 const isExpanded = ref(false);
 const isSubtaskExpanded = computed(() => taskStore.expandedSubtaskIds.includes(props.task.id));
 
@@ -159,6 +169,17 @@ const subtaskProgress = computed(() => {
 const circumference = 2 * Math.PI * 8; // r=8
 const progressOffset = computed(() => {
   return circumference - (subtaskProgress.value / 100) * circumference;
+});
+
+// 项目信息（仅在 showProject 模式下计算）
+const projectInfo = computed(() => {
+  if (!props.showProject) return null;
+  const project = projectStore.getProject(props.task.projectId);
+  if (!project) return null;
+  return {
+    name: project.name,
+    colorClass: COLOR_BG_MAP[project.color] || 'bg-gray-400',
+  };
 });
 
 const leftBorderColor = computed(() => {
